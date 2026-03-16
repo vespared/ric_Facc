@@ -1,6 +1,7 @@
 const DEBUG_CHANNEL_NAME = 'ric-facc-student-debug';
 const DEBUG_STORAGE_KEY = 'ricFaccDebugSnapshot';
-const REQUEST_SYNC_MS = 1400;
+const REQUEST_SYNC_MS = 500;
+const STORAGE_POLL_MS = 450;
 
 const debugConnectionStatus = document.getElementById('debugConnectionStatus');
 const debugPhaseBadge = document.getElementById('debugPhaseBadge');
@@ -52,7 +53,9 @@ const actionButtons = {
 
 let debugChannel = null;
 let syncTimer = null;
+let storagePollTimer = null;
 let lastSnapshotAt = 0;
+let lastStoredSnapshotRaw = null;
 
 function escapeHtml(value) {
     return String(value || '')
@@ -206,9 +209,10 @@ function sendAction(action) {
 function loadStoredSnapshot() {
     try {
         const rawSnapshot = localStorage.getItem(DEBUG_STORAGE_KEY);
-        if (!rawSnapshot) {
+        if (!rawSnapshot || rawSnapshot === lastStoredSnapshotRaw) {
             return;
         }
+        lastStoredSnapshotRaw = rawSnapshot;
         renderSnapshot(JSON.parse(rawSnapshot));
     } catch (error) {
         setActionStatus('Impossibile leggere lo stato locale del debug.', true);
@@ -235,14 +239,29 @@ if ('BroadcastChannel' in window) {
         renderStaleState();
     }, REQUEST_SYNC_MS);
 } else {
-    debugConnectionStatus.textContent = 'Non supportato';
-    debugConnectionStatus.style.color = 'var(--red)';
-    setActionStatus('Il browser non supporta BroadcastChannel.', true);
+    debugConnectionStatus.textContent = 'Fallback locale';
+    debugConnectionStatus.style.color = 'var(--yellow)';
+    setActionStatus('BroadcastChannel non disponibile: uso aggiornamento locale continuo.', false);
 }
+
+window.addEventListener('storage', (event) => {
+    if (event.key !== DEBUG_STORAGE_KEY || !event.newValue) {
+        return;
+    }
+    try {
+        lastStoredSnapshotRaw = event.newValue;
+        renderSnapshot(JSON.parse(event.newValue));
+    } catch (error) {
+        setActionStatus('Errore lettura aggiornamento live locale.', true);
+    }
+});
 
 window.addEventListener('beforeunload', () => {
     if (syncTimer) {
         window.clearInterval(syncTimer);
+    }
+    if (storagePollTimer) {
+        window.clearInterval(storagePollTimer);
     }
     if (debugChannel) {
         debugChannel.close();
@@ -251,3 +270,7 @@ window.addEventListener('beforeunload', () => {
 
 renderEvents([]);
 loadStoredSnapshot();
+storagePollTimer = window.setInterval(() => {
+    loadStoredSnapshot();
+    renderStaleState();
+}, STORAGE_POLL_MS);

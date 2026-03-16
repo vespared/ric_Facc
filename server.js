@@ -120,6 +120,9 @@ function handleApiRequest(request, response, url) {
         readRequestBody(request)
             .then((body) => {
                 const payload = body ? JSON.parse(body) : {};
+                if (!payload.frames && state.studentSnapshot && state.studentSnapshot.frames) {
+                    payload.frames = state.studentSnapshot.frames;
+                }
                 state.studentSnapshot = payload;
                 state.studentUpdatedAt = new Date().toISOString();
                 sendJson(response, 200, { ok: true, updatedAt: state.studentUpdatedAt });

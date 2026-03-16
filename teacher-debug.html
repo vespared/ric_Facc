@@ -49,6 +49,25 @@
 
         <main class="debug-grid">
             <section class="debug-column">
+                <div class="video-card">
+                    <div class="card-topline">
+                        <span class="card-kicker">Tracking remoto</span>
+                        <span class="card-status" id="teacherDebugCameraFeedStatus">In attesa del feed webcam</span>
+                    </div>
+
+                    <div class="debug-frame-grid">
+                        <div class="debug-frame debug-frame--tracking">
+                            <img id="teacherDebugTrackingFrame" class="debug-frame-image is-mirrored" alt="Tracking remoto studente">
+                            <div id="teacherDebugTrackingEmpty" class="debug-frame-empty">Il feed tracking apparira qui quando il quiz invia i frame.</div>
+                        </div>
+
+                        <div class="debug-frame debug-frame--zoom">
+                            <img id="teacherDebugZoomFrame" class="debug-frame-image" alt="Zoom occhi remoto">
+                            <div id="teacherDebugZoomEmpty" class="debug-frame-empty">Lo zoom occhi apparira qui quando il tracking e attivo.</div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="control-card">
                     <div class="card-topline">
                         <span class="card-kicker">Metriche sensori</span>

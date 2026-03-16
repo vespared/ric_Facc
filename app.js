@@ -179,15 +179,18 @@ const REMOTE_SYNC_ENABLED = window.location.protocol === 'http:' || window.locat
 const DEBUG_CHANNEL_NAME = 'ric-facc-student-debug';
 const DEBUG_STORAGE_KEY = 'ricFaccDebugSnapshot';
 const DEBUG_FRAME_INTERVAL_MS = 350;
+const REMOTE_DEBUG_FRAME_INTERVAL_MS = 700;
 
 let remoteStatePushInFlight = false;
 let remoteStatePushQueued = false;
+let remoteStateNeedsFrames = false;
 let remoteCommandPollInFlight = false;
 let remoteLastCommandId = null;
 let remoteStateTimer = null;
 let remoteCommandTimer = null;
 let debugChannel = null;
 let debugLastFrameAt = 0;
+let remoteLastFrameAt = 0;
 let lastFaceDetected = false;
 
 const remoteEventHistory = [];
@@ -339,9 +342,20 @@ async function fetchJson(path, options = {}) {
     return payload;
 }
 
-function buildStudentSnapshot() {
+function captureDebugFrames() {
+    try {
+        return {
+            tracking: canvasElement.toDataURL('image/webp', 0.62),
+            zoom: zoomCanvas.toDataURL('image/webp', 0.62)
+        };
+    } catch (error) {
+        return null;
+    }
+}
+
+function buildStudentSnapshot(includeFrames = false) {
     const question = simulationCompleted ? null : currentQuestion();
-    return {
+    const snapshot = {
         isRunning,
         cameraState: cameraState.textContent,
         currentState,
@@ -399,29 +413,28 @@ function buildStudentSnapshot() {
         },
         updatedAt: new Date().toISOString()
     };
-}
-
-function buildDebugSnapshot(includeFrames = false) {
-    const snapshot = buildStudentSnapshot();
 
     if (includeFrames) {
-        try {
-            snapshot.frames = {
-                tracking: canvasElement.toDataURL('image/webp', 0.72),
-                zoom: zoomCanvas.toDataURL('image/webp', 0.72)
-            };
-        } catch (error) {
-            snapshot.frames = null;
-        }
+        snapshot.frames = captureDebugFrames();
     }
 
     return snapshot;
 }
 
+function buildDebugSnapshot(includeFrames = false) {
+    return buildStudentSnapshot(includeFrames);
+}
+
 function persistDebugSnapshot(snapshot) {
     try {
+        const previousRawSnapshot = localStorage.getItem(DEBUG_STORAGE_KEY);
+        const previousSnapshot = previousRawSnapshot ? JSON.parse(previousRawSnapshot) : null;
         const storableSnapshot = { ...snapshot };
-        delete storableSnapshot.frames;
+
+        if (!storableSnapshot.frames && previousSnapshot && previousSnapshot.frames) {
+            storableSnapshot.frames = previousSnapshot.frames;
+        }
+
         localStorage.setItem(DEBUG_STORAGE_KEY, JSON.stringify(storableSnapshot));
     } catch (error) {
         console.warn('Impossibile salvare lo snapshot debug locale.', error);
@@ -523,11 +536,13 @@ async function pushStudentSnapshot() {
 
     remoteStatePushInFlight = true;
     remoteStatePushQueued = false;
+    const includeFrames = remoteStateNeedsFrames;
+    remoteStateNeedsFrames = false;
 
     try {
         await fetchJson('/api/student-state', {
             method: 'POST',
-            body: JSON.stringify(buildStudentSnapshot())
+            body: JSON.stringify(buildStudentSnapshot(includeFrames))
         });
         setRemoteSyncStatus('Server docente collegato sulla rete locale');
     } catch (error) {
@@ -540,11 +555,12 @@ async function pushStudentSnapshot() {
     }
 }
 
-function requestStudentSnapshotSync() {
+function requestStudentSnapshotSync(includeFrames = false) {
     publishDebugSnapshot(false);
     if (!REMOTE_SYNC_ENABLED) {
         return;
     }
+    remoteStateNeedsFrames = remoteStateNeedsFrames || includeFrames;
     remoteStatePushQueued = true;
     void pushStudentSnapshot();
 }
@@ -1687,6 +1703,7 @@ function updateZoomCanvas(landmarks, sourceImage) {
 }
 
 function onResults(results) {
+    const now = Date.now();
     canvasCtx.save();
     canvasCtx.fillStyle = '#08111f';
     canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
@@ -1725,6 +1742,11 @@ function onResults(results) {
 
     canvasCtx.restore();
     publishDebugSnapshot(true);
+
+    if (REMOTE_SYNC_ENABLED && now - remoteLastFrameAt >= REMOTE_DEBUG_FRAME_INTERVAL_MS) {
+        remoteLastFrameAt = now;
+        requestStudentSnapshotSync(true);
+    }
 }
 
 const faceMesh = new FaceMesh({

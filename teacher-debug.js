@@ -1,4 +1,4 @@
-const SNAPSHOT_REFRESH_MS = 1200;
+const SNAPSHOT_REFRESH_MS = 500;
 
 const teacherDebugConnectionStatus = document.getElementById('teacherDebugConnectionStatus');
 const teacherDebugPhaseBadge = document.getElementById('teacherDebugPhaseBadge');
@@ -9,6 +9,7 @@ const teacherDebugQuestionCounter = document.getElementById('teacherDebugQuestio
 const teacherDebugQuestionPrompt = document.getElementById('teacherDebugQuestionPrompt');
 const teacherDebugStatePill = document.getElementById('teacherDebugStatePill');
 const teacherDebugCameraState = document.getElementById('teacherDebugCameraState');
+const teacherDebugCameraFeedStatus = document.getElementById('teacherDebugCameraFeedStatus');
 const teacherDebugCommandState = document.getElementById('teacherDebugCommandState');
 const teacherDebugMachineState = document.getElementById('teacherDebugMachineState');
 const teacherDebugFaceDetected = document.getElementById('teacherDebugFaceDetected');
@@ -32,6 +33,10 @@ const teacherDebugRightEyeCard = document.getElementById('teacherDebugRightEyeCa
 const teacherDebugRightEyeStatus = document.getElementById('teacherDebugRightEyeStatus');
 const teacherDebugMouthCard = document.getElementById('teacherDebugMouthCard');
 const teacherDebugMouthStatus = document.getElementById('teacherDebugMouthStatus');
+const teacherDebugTrackingFrame = document.getElementById('teacherDebugTrackingFrame');
+const teacherDebugTrackingEmpty = document.getElementById('teacherDebugTrackingEmpty');
+const teacherDebugZoomFrame = document.getElementById('teacherDebugZoomFrame');
+const teacherDebugZoomEmpty = document.getElementById('teacherDebugZoomEmpty');
 
 let snapshotTimer = null;
 
@@ -74,6 +79,17 @@ function setConnectionStatus(message, isError = false) {
     teacherDebugConnectionStatus.style.color = isError ? 'var(--red)' : 'var(--text)';
 }
 
+function setFrame(imageElement, placeholderElement, value) {
+    if (!value) {
+        imageElement.removeAttribute('src');
+        placeholderElement.classList.remove('hidden');
+        return;
+    }
+
+    imageElement.src = value;
+    placeholderElement.classList.add('hidden');
+}
+
 function setSensorCard(cardElement, statusElement, sensor) {
     if (!sensor) {
         cardElement.classList.remove('state-open', 'state-closed');
@@ -111,6 +127,7 @@ function renderDisconnectedState(message) {
     teacherDebugQuestionPrompt.textContent = 'Apri il quiz studente con il server locale attivo.';
     teacherDebugStatePill.textContent = 'LETTURA';
     teacherDebugCameraState.textContent = '-';
+    teacherDebugCameraFeedStatus.textContent = 'In attesa del feed webcam';
     teacherDebugCommandState.textContent = '-';
     teacherDebugMachineState.textContent = '-';
     teacherDebugFaceDetected.textContent = 'No';
@@ -128,6 +145,8 @@ function renderDisconnectedState(message) {
     setSensorCard(teacherDebugLeftEyeCard, teacherDebugLeftEyeStatus, null);
     setSensorCard(teacherDebugRightEyeCard, teacherDebugRightEyeStatus, null);
     setSensorCard(teacherDebugMouthCard, teacherDebugMouthStatus, null);
+    setFrame(teacherDebugTrackingFrame, teacherDebugTrackingEmpty, null);
+    setFrame(teacherDebugZoomFrame, teacherDebugZoomEmpty, null);
     renderEvents([]);
 }
 
@@ -145,6 +164,9 @@ function renderSnapshot(snapshot) {
 
     teacherDebugStatePill.textContent = (snapshot.phaseLabel || 'LETTURA').toUpperCase();
     teacherDebugCameraState.textContent = snapshot.cameraState || '-';
+    teacherDebugCameraFeedStatus.textContent = snapshot.frames && snapshot.frames.tracking
+        ? 'Feed webcam remoto attivo'
+        : 'Tracking senza frame live disponibili';
     teacherDebugCommandState.textContent = snapshot.commandLabel || '-';
     teacherDebugMachineState.textContent = snapshot.currentState || '-';
     teacherDebugFaceDetected.textContent = snapshot.faceDetected ? 'Si' : 'No';
@@ -179,6 +201,8 @@ function renderSnapshot(snapshot) {
     setSensorCard(teacherDebugLeftEyeCard, teacherDebugLeftEyeStatus, snapshot.sensors && snapshot.sensors.leftEye);
     setSensorCard(teacherDebugRightEyeCard, teacherDebugRightEyeStatus, snapshot.sensors && snapshot.sensors.rightEye);
     setSensorCard(teacherDebugMouthCard, teacherDebugMouthStatus, snapshot.sensors && snapshot.sensors.mouth);
+    setFrame(teacherDebugTrackingFrame, teacherDebugTrackingEmpty, snapshot.frames && snapshot.frames.tracking);
+    setFrame(teacherDebugZoomFrame, teacherDebugZoomEmpty, snapshot.frames && snapshot.frames.zoom);
     renderEvents(snapshot.events);
 }
 
