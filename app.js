@@ -170,9 +170,21 @@ const downloadCsvTemplateBtn = document.getElementById('downloadCsvTemplateBtn')
 const downloadJsonTemplateBtn = document.getElementById('downloadJsonTemplateBtn');
 const restoreDefaultQuestionsBtn = document.getElementById('restoreDefaultQuestionsBtn');
 const importStatus = document.getElementById('importStatus');
+const remoteSyncStatus = document.getElementById('remoteSyncStatus');
+const teacherUrlHint = document.getElementById('teacherUrlHint');
 
 const LEFT_EYE = [362, 385, 387, 263, 373, 380];
 const RIGHT_EYE = [33, 160, 158, 133, 153, 144];
+const REMOTE_SYNC_ENABLED = window.location.protocol === 'http:' || window.location.protocol === 'https:';
+
+let remoteStatePushInFlight = false;
+let remoteStatePushQueued = false;
+let remoteCommandPollInFlight = false;
+let remoteLastCommandId = null;
+let remoteStateTimer = null;
+let remoteCommandTimer = null;
+
+const remoteEventHistory = [];
 
 function currentQuestion() {
     return questionSet[currentQuestionIndex];
@@ -279,6 +291,111 @@ function normalizeQuestion(rawQuestion, index) {
 function updateImportStatus(message, isError = false) {
     importStatus.textContent = message;
     importStatus.style.color = isError ? 'var(--red)' : 'var(--muted)';
+}
+
+function setRemoteSyncStatus(message, isError = false) {
+    if (!remoteSyncStatus) {
+        return;
+    }
+    remoteSyncStatus.textContent = message;
+    remoteSyncStatus.style.color = isError ? 'var(--red)' : 'var(--muted)';
+}
+
+function updateTeacherUrlHint() {
+    if (!teacherUrlHint) {
+        return;
+    }
+
+    teacherUrlHint.textContent = REMOTE_SYNC_ENABLED
+        ? `Pannello docente: ${window.location.origin}/teacher.html`
+        : 'Pannello docente disponibile avviando server.js e aprendo il quiz via http://localhost:3000';
+}
+
+async function fetchJson(path, options = {}) {
+    const response = await fetch(path, {
+        ...options,
+        cache: 'no-store',
+        headers: {
+            'Content-Type': 'application/json',
+            ...(options.headers || {})
+        }
+    });
+
+    const text = await response.text();
+    const payload = text ? JSON.parse(text) : {};
+
+    if (!response.ok) {
+        throw new Error(payload.error || `Richiesta non riuscita (${response.status}).`);
+    }
+
+    return payload;
+}
+
+function buildStudentSnapshot() {
+    const question = simulationCompleted ? null : currentQuestion();
+    return {
+        isRunning,
+        cameraState: cameraState.textContent,
+        currentState,
+        phaseLabel: phaseState.textContent,
+        commandLabel: commandState.textContent,
+        currentQuestionIndex,
+        questionCount: questionSet.length,
+        simulationCompleted,
+        focusedIndex,
+        selectedIndex,
+        answerLockedIndex,
+        questionCounterLabel: `${Math.min(currentQuestionIndex + 1, questionSet.length)} / ${questionSet.length}`,
+        metrics: {
+            leftEar: Number(latestEarLeft.toFixed(3)),
+            rightEar: Number(latestEarRight.toFixed(3)),
+            averageEar: Number((((latestEarLeft + latestEarRight) / 2) || 0).toFixed(3)),
+            mar: Number(latestMar.toFixed(3))
+        },
+        currentQuestion: question ? {
+            title: question.title,
+            prompt: question.prompt,
+            options: [...question.options],
+            correctIndex: question.correctIndex
+        } : null,
+        events: remoteEventHistory.slice(0, CONFIG.eventLogSize),
+        updatedAt: new Date().toISOString()
+    };
+}
+
+async function pushStudentSnapshot() {
+    if (!REMOTE_SYNC_ENABLED || !remoteStatePushQueued) {
+        return;
+    }
+    if (remoteStatePushInFlight) {
+        return;
+    }
+
+    remoteStatePushInFlight = true;
+    remoteStatePushQueued = false;
+
+    try {
+        await fetchJson('/api/student-state', {
+            method: 'POST',
+            body: JSON.stringify(buildStudentSnapshot())
+        });
+        setRemoteSyncStatus('Server docente collegato sulla rete locale');
+    } catch (error) {
+        setRemoteSyncStatus('Server docente non raggiungibile', true);
+    } finally {
+        remoteStatePushInFlight = false;
+        if (remoteStatePushQueued) {
+            void pushStudentSnapshot();
+        }
+    }
+}
+
+function requestStudentSnapshotSync() {
+    if (!REMOTE_SYNC_ENABLED) {
+        return;
+    }
+    remoteStatePushQueued = true;
+    void pushStudentSnapshot();
 }
 
 function mapRowToQuestion(row, rowIndex) {
@@ -504,6 +621,183 @@ function getTxtTemplate() {
     ].join('\n');
 }
 
+function insertQuestionIntoFlow(rawQuestion, insertIndex) {
+    const nextQuestions = questionSet.map((question) => ({
+        ...question,
+        options: [...question.options]
+    }));
+
+    nextQuestions.splice(insertIndex, 0, rawQuestion);
+    questionSet = cloneQuestionSet(nextQuestions);
+    return questionSet[insertIndex];
+}
+
+function publishQuestionNow(rawQuestion, source = 'Tablet docente') {
+    const insertIndex = Math.min(Math.max(currentQuestionIndex, 0), questionSet.length);
+    const insertedQuestion = insertQuestionIntoFlow(rawQuestion, insertIndex);
+
+    simulationCompleted = false;
+    currentQuestionIndex = insertIndex;
+    resetCurrentFlow(false);
+    updateImportStatus(`Domanda live pubblicata da ${source}`);
+    logEvent(`${source}: pubblicata subito ${insertedQuestion.title}.`);
+    speakText(`Nuova domanda del docente disponibile ora. ${insertedQuestion.title}.`, {
+        interrupt: true,
+        rate: 1.03,
+        pitch: 1.05
+    });
+}
+
+function queueQuestionAsNext(rawQuestion, source = 'Tablet docente') {
+    const insertIndex = simulationCompleted
+        ? questionSet.length
+        : Math.min(currentQuestionIndex + 1, questionSet.length);
+    const insertedQuestion = insertQuestionIntoFlow(rawQuestion, insertIndex);
+
+    if (simulationCompleted) {
+        simulationCompleted = false;
+        currentQuestionIndex = insertIndex;
+        resetCurrentFlow(false);
+        updateImportStatus(`Domanda live aggiunta e aperta da ${source}`);
+        logEvent(`${source}: il test riparte con ${insertedQuestion.title} aggiunta in coda.`);
+        speakText(`Nuova domanda aggiunta dal docente. ${insertedQuestion.title}.`, {
+            interrupt: true,
+            rate: 1.03,
+            pitch: 1.05
+        });
+        return;
+    }
+
+    updateQuestionHeader();
+    renderChoices();
+    updateStateUI();
+    updateImportStatus(`Domanda aggiunta in coda da ${source}`);
+    logEvent(`${source}: aggiunta in coda ${insertedQuestion.title}.`);
+    speakText(`Domanda del docente aggiunta come prossima domanda.`, {
+        interrupt: true,
+        rate: 1.02,
+        pitch: 1.04
+    });
+}
+
+async function executeRemoteCommand(command) {
+    const payload = command.payload || {};
+
+    if (command.type === 'start-camera') {
+        await startCamera();
+        return;
+    }
+
+    if (command.type === 'read-question') {
+        ensureAudioContext();
+        readCurrentQuestion();
+        return;
+    }
+
+    if (command.type === 'simulate-scroll') {
+        ensureAudioContext();
+        handleScrollCommand('Tablet docente');
+        return;
+    }
+
+    if (command.type === 'simulate-select') {
+        ensureAudioContext();
+        if (currentState === 'confirm') {
+            await simulateEyeHold('cancel', 'Tablet docente');
+        } else {
+            await simulateEyeHold('select', 'Tablet docente');
+        }
+        return;
+    }
+
+    if (command.type === 'simulate-confirm') {
+        ensureAudioContext();
+        if (currentState === 'confirm') {
+            confirmSelection('Tablet docente');
+        } else {
+            logEvent('Tablet docente: conferma ignorata, safe check non attivo.');
+        }
+        return;
+    }
+
+    if (command.type === 'reset-flow') {
+        resetCurrentFlow(true);
+        logEvent('Tablet docente: reset completo della simulazione.');
+        speakText('Simulazione resettata dal professore.', { interrupt: true, rate: 1.03 });
+        return;
+    }
+
+    if (command.type === 'publish-now') {
+        publishQuestionNow(payload.question || {}, 'Tablet docente');
+        return;
+    }
+
+    if (command.type === 'queue-next') {
+        queueQuestionAsNext(payload.question || {}, 'Tablet docente');
+    }
+}
+
+async function pollRemoteCommands() {
+    if (!REMOTE_SYNC_ENABLED || remoteCommandPollInFlight) {
+        return;
+    }
+
+    remoteCommandPollInFlight = true;
+
+    try {
+        const after = remoteLastCommandId === null ? 0 : remoteLastCommandId;
+        const response = await fetchJson(`/api/commands?after=${after}`);
+        const commands = Array.isArray(response.commands) ? response.commands : [];
+        const latestCommandId = Number(response.latestCommandId || 0);
+
+        if (remoteLastCommandId === null) {
+            remoteLastCommandId = latestCommandId;
+            return;
+        }
+
+        for (const command of commands) {
+            try {
+                await executeRemoteCommand(command);
+            } catch (error) {
+                console.error('Errore comando remoto:', error);
+                logEvent(`Comando remoto fallito: ${error.message}`);
+            }
+            remoteLastCommandId = command.id;
+        }
+
+        if (commands.length === 0) {
+            remoteLastCommandId = Math.max(remoteLastCommandId, latestCommandId);
+        }
+
+        setRemoteSyncStatus('Server docente collegato sulla rete locale');
+    } catch (error) {
+        setRemoteSyncStatus('Server docente non raggiungibile', true);
+    } finally {
+        remoteCommandPollInFlight = false;
+    }
+}
+
+function startRemoteSync() {
+    updateTeacherUrlHint();
+
+    if (!REMOTE_SYNC_ENABLED) {
+        setRemoteSyncStatus('Apri il quiz tramite server locale per collegare il tablet docente');
+        return;
+    }
+
+    setRemoteSyncStatus('Sincronizzazione docente in avvio...');
+    requestStudentSnapshotSync();
+    void pollRemoteCommands();
+
+    remoteStateTimer = window.setInterval(() => {
+        requestStudentSnapshotSync();
+    }, 1200);
+
+    remoteCommandTimer = window.setInterval(() => {
+        void pollRemoteCommands();
+    }, 900);
+}
+
 function getDistance(p1, p2) {
     return Math.hypot(p1.x - p2.x, p1.y - p2.y);
 }
@@ -675,32 +969,46 @@ function speakText(text, options = {}) {
 
 function setCommandState(label) {
     commandState.textContent = label;
+    requestStudentSnapshotSync();
 }
 
 function logEvent(message) {
+    const createdAt = new Date();
     const item = document.createElement('li');
-    const time = new Date().toLocaleTimeString('it-IT', {
+    const time = createdAt.toLocaleTimeString('it-IT', {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit'
     });
+    remoteEventHistory.unshift({
+        time,
+        message,
+        createdAt: createdAt.toISOString()
+    });
+    while (remoteEventHistory.length > CONFIG.eventLogSize) {
+        remoteEventHistory.pop();
+    }
     item.innerHTML = `<span class="log-time">${time}</span><span class="log-text">${message}</span>`;
     eventLog.prepend(item);
     while (eventLog.children.length > CONFIG.eventLogSize) {
         eventLog.removeChild(eventLog.lastElementChild);
     }
+    requestStudentSnapshotSync();
 }
+
 function updateQuestionHeader() {
     if (simulationCompleted) {
         questionTitle.textContent = 'Test completato';
         questionCounter.textContent = `${questionSet.length} / ${questionSet.length}`;
         questionText.textContent = 'Flusso validato: attivazione, scrolling, preselezione e conferma hanno completato il test. Premi "Resetta domanda" per ricominciare.';
+        requestStudentSnapshotSync();
         return;
     }
     const question = currentQuestion();
     questionTitle.textContent = question.title;
     questionCounter.textContent = `${currentQuestionIndex + 1} / ${questionSet.length}`;
     questionText.textContent = question.prompt;
+    requestStudentSnapshotSync();
 }
 
 function syncConfirmCard() {
@@ -830,6 +1138,7 @@ function updateStateUI() {
 
     syncConfirmCard();
     syncChoices();
+    requestStudentSnapshotSync();
 }
 
 function setState(nextState) {
@@ -1468,6 +1777,12 @@ restoreDefaultQuestionsBtn.addEventListener('click', () => {
 });
 
 window.addEventListener('beforeunload', () => {
+    if (remoteStateTimer) {
+        window.clearInterval(remoteStateTimer);
+    }
+    if (remoteCommandTimer) {
+        window.clearInterval(remoteCommandTimer);
+    }
     if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
     }
@@ -1482,6 +1797,7 @@ if (window.speechSynthesis && typeof window.speechSynthesis.addEventListener ===
 resetCurrentFlow(true);
 logEvent('Profilo calibrato caricato: EAR 0.13, MAR 0.17, occhiali attivi.');
 setCommandState('In attesa');
+startRemoteSync();
 
 
 

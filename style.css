@@ -50,6 +50,8 @@ select {
 .profile-card,
 .quiz-card,
 .control-card,
+.import-card,
+.network-card,
 .log-card,
 .sensor-card,
 .mini-card {
@@ -152,6 +154,8 @@ select {
 .profile-card,
 .quiz-card,
 .control-card,
+.import-card,
+.network-card,
 .log-card {
     border-radius: 26px;
     padding: 20px;
@@ -645,6 +649,25 @@ select {
 .import-card {
     border-radius: 26px;
     padding: 20px;
+}
+
+.network-card {
+    display: grid;
+    gap: 14px;
+}
+
+.network-text {
+    color: var(--muted);
+    line-height: 1.6;
+}
+
+.network-hint {
+    padding: 14px 16px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text);
+    word-break: break-word;
 }
 
 .file-picker {

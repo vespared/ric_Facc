@@ -1,0 +1,190 @@
+.teacher-body {
+    min-height: 100vh;
+}
+
+.teacher-shell {
+    width: min(1480px, 100%);
+    margin: 0 auto;
+    padding: 28px clamp(18px, 3vw, 36px) 40px;
+}
+
+.teacher-hero h1 {
+    max-width: 12ch;
+}
+
+.teacher-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
+    gap: 22px;
+}
+
+.teacher-column {
+    display: grid;
+    gap: 18px;
+    align-content: start;
+}
+
+.teacher-status-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.teacher-question-card h2 {
+    font-size: clamp(1.4rem, 2.4vw, 2rem);
+    margin-top: 10px;
+}
+
+.teacher-question-text {
+    font-size: 1.02rem;
+    margin-top: 14px;
+}
+
+.teacher-choice-list {
+    display: grid;
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.teacher-choice-item {
+    border-radius: 20px;
+    padding: 16px 18px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: grid;
+    gap: 10px;
+    transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.teacher-choice-item.is-current-focus {
+    border-color: rgba(45, 226, 230, 0.7);
+    box-shadow: 0 14px 28px rgba(45, 226, 230, 0.12);
+    transform: translateY(-1px);
+}
+
+.teacher-choice-item.is-selected {
+    border-color: rgba(255, 209, 102, 0.8);
+}
+
+.teacher-choice-item.is-locked {
+    border-color: rgba(113, 247, 159, 0.75);
+    box-shadow: 0 14px 28px rgba(113, 247, 159, 0.14);
+}
+
+.teacher-choice-item.is-correct-answer .teacher-choice-tag {
+    background: rgba(113, 247, 159, 0.2);
+    color: var(--green);
+}
+
+.teacher-choice-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+}
+
+.teacher-choice-letter {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text);
+}
+
+.teacher-choice-tag {
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.teacher-choice-text {
+    color: var(--text);
+    line-height: 1.5;
+}
+
+.teacher-feedback-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.teacher-command-grid,
+.teacher-submit-grid,
+.teacher-form-grid {
+    display: grid;
+    gap: 12px;
+}
+
+.teacher-command-grid,
+.teacher-submit-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.teacher-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.teacher-field {
+    display: grid;
+    gap: 8px;
+}
+
+.teacher-field span {
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.teacher-field input,
+.teacher-field textarea,
+.teacher-field select {
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    padding: 14px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text);
+    outline: none;
+    resize: vertical;
+}
+
+.teacher-field input::placeholder,
+.teacher-field textarea::placeholder {
+    color: rgba(156, 179, 217, 0.7);
+}
+
+.teacher-field input:focus,
+.teacher-field textarea:focus,
+.teacher-field select:focus {
+    border-color: rgba(45, 226, 230, 0.7);
+    box-shadow: 0 0 0 3px rgba(45, 226, 230, 0.14);
+}
+
+.teacher-field-full {
+    grid-column: 1 / -1;
+}
+
+.teacher-note-list {
+    margin-top: 14px;
+}
+
+@media (max-width: 1180px) {
+    .teacher-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 760px) {
+    .teacher-shell {
+        padding: 18px 14px 28px;
+    }
+
+    .teacher-status-grid,
+    .teacher-feedback-grid,
+    .teacher-command-grid,
+    .teacher-submit-grid,
+    .teacher-form-grid {
+        grid-template-columns: 1fr;
+    }
+}

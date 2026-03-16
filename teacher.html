@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ric_Facc | Pannello docente</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="teacher.css">
+</head>
+
+<body class="teacher-body">
+    <div class="teacher-shell">
+        <header class="hero-panel teacher-hero">
+            <div class="hero-copy">
+                <p class="eyebrow">Pannello docente</p>
+                <h1>Controllo live del quiz da tablet</h1>
+                <p class="hero-text">
+                    Il professore puo vedere in tempo reale cosa sta facendo il ragazzo, inviare comandi al PC e
+                    pubblicare nuove domande subito o in coda.
+                </p>
+            </div>
+
+            <div class="hero-badges">
+                <div class="hero-badge">
+                    <span>Connessione</span>
+                    <strong id="teacherConnectionStatus">In attesa</strong>
+                </div>
+                <div class="hero-badge">
+                    <span>Fase studente</span>
+                    <strong id="teacherPhaseBadge">-</strong>
+                </div>
+                <div class="hero-badge">
+                    <span>Domanda</span>
+                    <strong id="teacherQuestionBadge">-</strong>
+                </div>
+            </div>
+        </header>
+
+        <main class="teacher-grid">
+            <section class="teacher-column">
+                <div class="quiz-card teacher-monitor-card">
+                    <div class="card-topline">
+                        <span class="card-kicker">Vista studente</span>
+                        <span class="card-status" id="teacherLastUpdate">Nessun dato ricevuto</span>
+                    </div>
+
+                    <div class="teacher-status-grid">
+                        <article class="mini-card">
+                            <span>Webcam</span>
+                            <strong id="studentCameraStatus">-</strong>
+                        </article>
+                        <article class="mini-card">
+                            <span>Comando live</span>
+                            <strong id="studentCommandStatus">-</strong>
+                        </article>
+                        <article class="mini-card">
+                            <span>Stato macchina</span>
+                            <strong id="studentStateStatus">-</strong>
+                        </article>
+                        <article class="mini-card">
+                            <span>Indice domanda</span>
+                            <strong id="studentCounterStatus">-</strong>
+                        </article>
+                    </div>
+
+                    <article class="question-card teacher-question-card">
+                        <p class="question-label">Domanda attuale</p>
+                        <h2 id="teacherQuestionTitle">Quiz non ancora collegato</h2>
+                        <p class="question-text teacher-question-text" id="teacherQuestionPrompt">
+                            Apri prima il quiz del ragazzo sul PC tramite server locale e poi usa questa pagina dal tablet.
+                        </p>
+                    </article>
+
+                    <div class="teacher-choice-list" id="teacherChoiceList"></div>
+                </div>
+
+                <div class="control-card teacher-metrics-card">
+                    <div class="card-topline">
+                        <span class="card-kicker">Sensori live</span>
+                        <span class="card-status">Aggiornamento automatico</span>
+                    </div>
+
+                    <div class="feedback-grid teacher-feedback-grid">
+                        <article class="mini-card">
+                            <span>EAR sx</span>
+                            <strong id="teacherLeftEar">0.000</strong>
+                        </article>
+                        <article class="mini-card">
+                            <span>EAR dx</span>
+                            <strong id="teacherRightEar">0.000</strong>
+                        </article>
+                        <article class="mini-card">
+                            <span>EAR medio</span>
+                            <strong id="teacherAverageEar">0.000</strong>
+                        </article>
+                        <article class="mini-card">
+                            <span>MAR</span>
+                            <strong id="teacherMar">0.000</strong>
+                        </article>
+                    </div>
+                </div>
+
+                <div class="log-card teacher-log-card">
+                    <div class="card-topline">
+                        <span class="card-kicker">Eventi recenti</span>
+                        <span class="card-status">Ultimi passaggi registrati dal quiz</span>
+                    </div>
+                    <ul class="event-log" id="teacherEventLog"></ul>
+                </div>
+            </section>
+
+            <section class="teacher-column">
+                <div class="control-card">
+                    <div class="card-topline">
+                        <span class="card-kicker">Controlli remoti</span>
+                        <span class="card-status" id="teacherActionStatus">Pronto a inviare comandi</span>
+                    </div>
+
+                    <div class="teacher-command-grid">
+                        <button id="teacherStartCameraBtn" class="action-btn primary">Avvia webcam sul PC</button>
+                        <button id="teacherReadQuestionBtn" class="action-btn secondary">Leggi domanda</button>
+                        <button id="teacherScrollBtn" class="action-btn accent">Scroll risposta</button>
+                        <button id="teacherSelectBtn" class="action-btn accent">Seleziona / Annulla</button>
+                        <button id="teacherConfirmBtn" class="action-btn primary">Conferma risposta</button>
+                        <button id="teacherResetBtn" class="action-btn secondary">Resetta quiz</button>
+                    </div>
+                </div>
+
+                <div class="import-card teacher-compose-card">
+                    <div class="card-topline">
+                        <span class="card-kicker">Nuova domanda live</span>
+                        <span class="card-status">Invio istantaneo dal tablet</span>
+                    </div>
+
+                    <div class="teacher-form-grid">
+                        <label class="teacher-field">
+                            <span>Titolo</span>
+                            <input id="teacherQuestionTitleInput" type="text" placeholder="Es. Domanda bonus">
+                        </label>
+
+                        <label class="teacher-field teacher-field-full">
+                            <span>Testo domanda</span>
+                            <textarea id="teacherQuestionPromptInput" rows="4"
+                                placeholder="Scrivi qui la domanda a scelta multipla"></textarea>
+                        </label>
+
+                        <label class="teacher-field">
+                            <span>Risposta A</span>
+                            <input id="teacherOptionAInput" type="text" placeholder="Prima risposta">
+                        </label>
+
+                        <label class="teacher-field">
+                            <span>Risposta B</span>
+                            <input id="teacherOptionBInput" type="text" placeholder="Seconda risposta">
+                        </label>
+
+                        <label class="teacher-field">
+                            <span>Risposta C</span>
+                            <input id="teacherOptionCInput" type="text" placeholder="Terza risposta">
+                        </label>
+
+                        <label class="teacher-field">
+                            <span>Risposta D</span>
+                            <input id="teacherOptionDInput" type="text" placeholder="Quarta risposta">
+                        </label>
+
+                        <label class="teacher-field">
+                            <span>Risposta corretta</span>
+                            <select id="teacherCorrectAnswerInput">
+                                <option value="0">A</option>
+                                <option value="1">B</option>
+                                <option value="2">C</option>
+                                <option value="3">D</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <div class="teacher-submit-grid">
+                        <button id="teacherPublishNowBtn" class="action-btn primary">Pubblica subito sul quiz</button>
+                        <button id="teacherQueueNextBtn" class="action-btn secondary">Aggiungi come prossima</button>
+                    </div>
+
+                    <ul class="format-list teacher-note-list">
+                        <li><strong>Pubblica subito:</strong> la nuova domanda entra immediatamente nel punto corrente del quiz.</li>
+                        <li><strong>Aggiungi come prossima:</strong> la domanda viene messa in coda subito dopo quella attuale.</li>
+                        <li><strong>Rete locale:</strong> tablet e PC devono essere collegati allo stesso server nella stessa rete.</li>
+                    </ul>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="teacher.js"></script>
+</body>
+
+</html>
