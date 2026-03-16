@@ -176,6 +176,9 @@ const teacherUrlHint = document.getElementById('teacherUrlHint');
 const LEFT_EYE = [362, 385, 387, 263, 373, 380];
 const RIGHT_EYE = [33, 160, 158, 133, 153, 144];
 const REMOTE_SYNC_ENABLED = window.location.protocol === 'http:' || window.location.protocol === 'https:';
+const DEBUG_CHANNEL_NAME = 'ric-facc-student-debug';
+const DEBUG_STORAGE_KEY = 'ricFaccDebugSnapshot';
+const DEBUG_FRAME_INTERVAL_MS = 350;
 
 let remoteStatePushInFlight = false;
 let remoteStatePushQueued = false;
@@ -183,6 +186,9 @@ let remoteCommandPollInFlight = false;
 let remoteLastCommandId = null;
 let remoteStateTimer = null;
 let remoteCommandTimer = null;
+let debugChannel = null;
+let debugLastFrameAt = 0;
+let lastFaceDetected = false;
 
 const remoteEventHistory = [];
 
@@ -299,6 +305,7 @@ function setRemoteSyncStatus(message, isError = false) {
     }
     remoteSyncStatus.textContent = message;
     remoteSyncStatus.style.color = isError ? 'var(--red)' : 'var(--muted)';
+    publishDebugSnapshot(false);
 }
 
 function updateTeacherUrlHint() {
@@ -309,6 +316,7 @@ function updateTeacherUrlHint() {
     teacherUrlHint.textContent = REMOTE_SYNC_ENABLED
         ? `Pannello docente: ${window.location.origin}/teacher.html`
         : 'Pannello docente disponibile avviando server.js e aprendo il quiz via http://localhost:3000';
+    publishDebugSnapshot(false);
 }
 
 async function fetchJson(path, options = {}) {
@@ -346,11 +354,37 @@ function buildStudentSnapshot() {
         selectedIndex,
         answerLockedIndex,
         questionCounterLabel: `${Math.min(currentQuestionIndex + 1, questionSet.length)} / ${questionSet.length}`,
+        faceDetected: lastFaceDetected,
         metrics: {
             leftEar: Number(latestEarLeft.toFixed(3)),
             rightEar: Number(latestEarRight.toFixed(3)),
             averageEar: Number((((latestEarLeft + latestEarRight) / 2) || 0).toFixed(3)),
             mar: Number(latestMar.toFixed(3))
+        },
+        sensors: {
+            leftEye: {
+                value: Number(latestEarLeft.toFixed(3)),
+                threshold: EAR_THRESHOLD,
+                status: elLeftEyeStatus.textContent,
+                isOpen: latestEarLeft > EAR_THRESHOLD
+            },
+            rightEye: {
+                value: Number(latestEarRight.toFixed(3)),
+                threshold: EAR_THRESHOLD,
+                status: elRightEyeStatus.textContent,
+                isOpen: latestEarRight > EAR_THRESHOLD
+            },
+            mouth: {
+                value: Number(latestMar.toFixed(3)),
+                threshold: MAR_THRESHOLD,
+                status: elMouthStatus.textContent,
+                isOpen: latestMar > MAR_THRESHOLD
+            }
+        },
+        thresholds: {
+            ear: EAR_THRESHOLD,
+            mar: MAR_THRESHOLD,
+            glassesMode: isGlassesMode
         },
         currentQuestion: question ? {
             title: question.title,
@@ -359,8 +393,124 @@ function buildStudentSnapshot() {
             correctIndex: question.correctIndex
         } : null,
         events: remoteEventHistory.slice(0, CONFIG.eventLogSize),
+        remote: {
+            status: remoteSyncStatus.textContent,
+            teacherUrl: teacherUrlHint.textContent
+        },
         updatedAt: new Date().toISOString()
     };
+}
+
+function buildDebugSnapshot(includeFrames = false) {
+    const snapshot = buildStudentSnapshot();
+
+    if (includeFrames) {
+        try {
+            snapshot.frames = {
+                tracking: canvasElement.toDataURL('image/webp', 0.72),
+                zoom: zoomCanvas.toDataURL('image/webp', 0.72)
+            };
+        } catch (error) {
+            snapshot.frames = null;
+        }
+    }
+
+    return snapshot;
+}
+
+function persistDebugSnapshot(snapshot) {
+    try {
+        const storableSnapshot = { ...snapshot };
+        delete storableSnapshot.frames;
+        localStorage.setItem(DEBUG_STORAGE_KEY, JSON.stringify(storableSnapshot));
+    } catch (error) {
+        console.warn('Impossibile salvare lo snapshot debug locale.', error);
+    }
+}
+
+function publishDebugSnapshot(includeFrames = false, force = false) {
+    const now = Date.now();
+    if (includeFrames && !force && now - debugLastFrameAt < DEBUG_FRAME_INTERVAL_MS) {
+        return;
+    }
+
+    const snapshot = buildDebugSnapshot(includeFrames);
+    persistDebugSnapshot(snapshot);
+
+    if (includeFrames) {
+        debugLastFrameAt = now;
+    }
+
+    if (debugChannel) {
+        debugChannel.postMessage({
+            type: 'student-debug-snapshot',
+            snapshot
+        });
+    }
+}
+
+function dispatchDebugAction(action) {
+    switch (action) {
+        case 'start-camera':
+            void startCamera();
+            break;
+        case 'read-question':
+            ensureAudioContext();
+            readCurrentQuestion();
+            break;
+        case 'simulate-scroll':
+            ensureAudioContext();
+            handleScrollCommand('Debug sviluppatore');
+            break;
+        case 'simulate-select':
+            ensureAudioContext();
+            if (currentState === 'confirm') {
+                void simulateEyeHold('cancel', 'Debug sviluppatore');
+            } else {
+                void simulateEyeHold('select', 'Debug sviluppatore');
+            }
+            break;
+        case 'simulate-confirm':
+            ensureAudioContext();
+            if (currentState === 'confirm') {
+                confirmSelection('Debug sviluppatore');
+            } else {
+                logEvent('Conferma da debug ignorata: safe check non attivo.');
+            }
+            break;
+        case 'run-demo':
+            ensureAudioContext();
+            void runAutomaticDemo();
+            break;
+        case 'reset-flow':
+            resetCurrentFlow(true);
+            logEvent('Reset completo richiesto dalla sessione sviluppatore.');
+            speakText('Simulazione resettata dalla sessione sviluppatore.', { interrupt: true, rate: 1.03 });
+            break;
+        default:
+            break;
+    }
+}
+
+function setupDebugBridge() {
+    if (!('BroadcastChannel' in window)) {
+        publishDebugSnapshot(false, true);
+        return;
+    }
+
+    debugChannel = new BroadcastChannel(DEBUG_CHANNEL_NAME);
+    debugChannel.addEventListener('message', (event) => {
+        const payload = event.data || {};
+        if (payload.type === 'debug-request-sync') {
+            publishDebugSnapshot(true, true);
+            return;
+        }
+        if (payload.type === 'debug-action' && payload.action) {
+            dispatchDebugAction(payload.action);
+        }
+    });
+
+    publishDebugSnapshot(false, true);
 }
 
 async function pushStudentSnapshot() {
@@ -391,6 +541,7 @@ async function pushStudentSnapshot() {
 }
 
 function requestStudentSnapshotSync() {
+    publishDebugSnapshot(false);
     if (!REMOTE_SYNC_ENABLED) {
         return;
     }
@@ -1541,6 +1692,7 @@ function onResults(results) {
     canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
 
     if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+        lastFaceDetected = true;
         loadingOverlay.classList.remove('active');
         const landmarks = results.multiFaceLandmarks[0];
 
@@ -1566,11 +1718,13 @@ function onResults(results) {
         updateZoomCanvas(landmarks, results.image);
         updateChoiceMachine(leftEar, rightEar, mar, true);
     } else {
+        lastFaceDetected = false;
         updateZoomCanvas(null, null);
         updateChoiceMachine(latestEarLeft, latestEarRight, latestMar, false);
     }
 
     canvasCtx.restore();
+    publishDebugSnapshot(true);
 }
 
 const faceMesh = new FaceMesh({
@@ -1783,6 +1937,9 @@ window.addEventListener('beforeunload', () => {
     if (remoteCommandTimer) {
         window.clearInterval(remoteCommandTimer);
     }
+    if (debugChannel) {
+        debugChannel.close();
+    }
     if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
     }
@@ -1794,6 +1951,7 @@ if (window.speechSynthesis && typeof window.speechSynthesis.addEventListener ===
     });
 }
 
+setupDebugBridge();
 resetCurrentFlow(true);
 logEvent('Profilo calibrato caricato: EAR 0.13, MAR 0.17, occhiali attivi.');
 setCommandState('In attesa');

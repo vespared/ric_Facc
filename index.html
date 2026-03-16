@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="it">
 
 <head>
@@ -27,12 +27,17 @@
     <div class="app-shell">
         <header class="hero-panel">
             <div class="hero-copy">
-                <p class="eyebrow">Sistema di scelta calibrato</p>
+                <p class="eyebrow">Sessione quiz</p>
                 <h1>Kahoot accessibile a sguardo, occhi e bocca</h1>
                 <p class="hero-text">
-                    Simulazione del flusso di attivazione risposta, scorrimento, preselezione e conferma
-                    usando i parametri validati del progetto.
+                    La schermata principale mostra solo il flusso del quiz. Tracking live, telemetria,
+                    log e strumenti sviluppatore sono disponibili in una sessione dedicata.
                 </p>
+                <div class="hero-link-row">
+                    <a class="action-btn secondary" href="debug.html" target="_blank" rel="noopener">
+                        Apri sessione sviluppatore
+                    </a>
+                </div>
             </div>
 
             <div class="hero-badges">
@@ -51,90 +56,22 @@
             </div>
         </header>
 
-        <main class="main-grid">
-            <section class="sensor-column">
-                <div class="video-card">
-                    <div class="card-topline">
-                        <span class="card-kicker">Tracking live</span>
-                        <span class="card-status" id="cameraState">Webcam non avviata</span>
+        <main class="main-grid main-grid--quiz">
+            <section class="experience-column experience-column--wide">
+                <div class="session-toolbar">
+                    <div>
+                        <p class="eyebrow">Controlli essenziali</p>
+                        <h2>Quiz studente</h2>
                     </div>
-
-                    <div class="video-wrapper">
-                        <video class="input_video" autoplay playsinline muted></video>
-                        <canvas class="output_canvas" width="640" height="480"></canvas>
-
-                        <div id="loading" class="loading-overlay">
-                            <div class="spinner"></div>
-                            <p>Preparazione del face tracking in corso...</p>
-                        </div>
-                    </div>
-
-                    <div class="video-actions">
+                    <div class="session-toolbar-actions">
                         <button id="startBtn" class="action-btn primary">Avvia webcam</button>
                         <button id="readQuestionBtn" class="action-btn secondary">Leggi domanda</button>
+                        <a class="action-btn secondary" href="debug.html" target="_blank" rel="noopener">
+                            Debug live
+                        </a>
                     </div>
                 </div>
 
-                <div class="zoom-card">
-                    <div class="card-topline">
-                        <span class="card-kicker">Dettaglio occhi</span>
-                        <span class="card-status">Filtro anti-rumore attivo</span>
-                    </div>
-                    <canvas id="zoomCanvas" class="zoom-canvas" width="320" height="160"></canvas>
-                </div>
-
-                <div class="sensor-grid">
-                    <article class="sensor-card" id="leftEyeCard">
-                        <div class="sensor-header">
-                            <h2>Occhio sinistro</h2>
-                            <span class="sensor-dot"></span>
-                        </div>
-                        <div class="sensor-state" id="leftEyeStatus">ATTESA</div>
-                        <div class="sensor-metric">
-                            <span>EAR</span>
-                            <strong id="leftEyeEar">0.000</strong>
-                        </div>
-                    </article>
-
-                    <article class="sensor-card" id="rightEyeCard">
-                        <div class="sensor-header">
-                            <h2>Occhio destro</h2>
-                            <span class="sensor-dot"></span>
-                        </div>
-                        <div class="sensor-state" id="rightEyeStatus">ATTESA</div>
-                        <div class="sensor-metric">
-                            <span>EAR</span>
-                            <strong id="rightEyeEar">0.000</strong>
-                        </div>
-                    </article>
-
-                    <article class="sensor-card" id="mouthCard">
-                        <div class="sensor-header">
-                            <h2>Bocca</h2>
-                            <span class="sensor-dot"></span>
-                        </div>
-                        <div class="sensor-state" id="mouthStatus">ATTESA</div>
-                        <div class="sensor-metric">
-                            <span>MAR</span>
-                            <strong id="mouthMar">0.000</strong>
-                        </div>
-                    </article>
-                </div>
-
-                <div class="profile-card">
-                    <div class="card-topline">
-                        <span class="card-kicker">Profilo validato</span>
-                        <span class="card-status">Pronto per il test</span>
-                    </div>
-                    <ul class="profile-list">
-                        <li id="earProfile">Chiusura occhi intenzionale sotto EAR 0.13</li>
-                        <li id="marProfile">Scroll con bocca sopra MAR 0.17</li>
-                        <li id="glassesProfile">Smoothing e soglie ottimizzate per utilizzo con occhiali</li>
-                    </ul>
-                </div>
-            </section>
-
-            <section class="experience-column">
                 <div class="quiz-card">
                     <div class="quiz-header">
                         <div>
@@ -174,21 +111,6 @@
                     </aside>
                 </div>
 
-                <div class="control-card">
-                    <div class="card-topline">
-                        <span class="card-kicker">Test rapido</span>
-                        <span class="card-status">Simulazione senza attese</span>
-                    </div>
-
-                    <div class="control-grid">
-                        <button id="simulateScrollBtn" class="action-btn accent">Simula scroll bocca</button>
-                        <button id="simulateSelectBtn" class="action-btn accent">Simula chiusura occhi</button>
-                        <button id="simulateConfirmBtn" class="action-btn accent">Simula conferma</button>
-                        <button id="runDemoBtn" class="action-btn secondary">Esegui demo automatica</button>
-                        <button id="resetFlowBtn" class="action-btn secondary">Resetta domanda</button>
-                    </div>
-                </div>
-
                 <div class="import-card">
                     <div class="card-topline">
                         <span class="card-kicker">Importa domande</span>
@@ -225,41 +147,130 @@
                     </p>
                     <div class="network-hint" id="teacherUrlHint">Percorso docente: /teacher.html</div>
                 </div>
-
-                <div class="feedback-grid">
-                    <article class="mini-card">
-                        <span>EAR medio</span>
-                        <strong id="avgEarValue">0.000</strong>
-                    </article>
-                    <article class="mini-card">
-                        <span>MAR live</span>
-                        <strong id="liveMarValue">0.000</strong>
-                    </article>
-                    <article class="mini-card">
-                        <span>Comando rilevato</span>
-                        <strong id="commandState">In attesa</strong>
-                    </article>
-                    <article class="mini-card">
-                        <span>Fase test</span>
-                        <strong id="phaseState">Lettura</strong>
-                    </article>
-                </div>
-
-                <div class="log-card">
-                    <div class="card-topline">
-                        <span class="card-kicker">Log del processo</span>
-                        <span class="card-status">Ultimi eventi</span>
-                    </div>
-                    <ul id="eventLog" class="event-log"></ul>
-                </div>
             </section>
         </main>
+
+        <section class="developer-bridge-hidden" aria-hidden="true" inert>
+            <div class="video-card">
+                <div class="card-topline">
+                    <span class="card-kicker">Tracking live</span>
+                    <span class="card-status" id="cameraState">Webcam non avviata</span>
+                </div>
+
+                <div class="video-wrapper">
+                    <video class="input_video" autoplay playsinline muted></video>
+                    <canvas class="output_canvas" width="640" height="480"></canvas>
+
+                    <div id="loading" class="loading-overlay">
+                        <div class="spinner"></div>
+                        <p>Preparazione del face tracking in corso...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="zoom-card">
+                <div class="card-topline">
+                    <span class="card-kicker">Dettaglio occhi</span>
+                    <span class="card-status">Filtro anti-rumore attivo</span>
+                </div>
+                <canvas id="zoomCanvas" class="zoom-canvas" width="320" height="160"></canvas>
+            </div>
+
+            <div class="sensor-grid">
+                <article class="sensor-card" id="leftEyeCard">
+                    <div class="sensor-header">
+                        <h2>Occhio sinistro</h2>
+                        <span class="sensor-dot"></span>
+                    </div>
+                    <div class="sensor-state" id="leftEyeStatus">ATTESA</div>
+                    <div class="sensor-metric">
+                        <span>EAR</span>
+                        <strong id="leftEyeEar">0.000</strong>
+                    </div>
+                </article>
+
+                <article class="sensor-card" id="rightEyeCard">
+                    <div class="sensor-header">
+                        <h2>Occhio destro</h2>
+                        <span class="sensor-dot"></span>
+                    </div>
+                    <div class="sensor-state" id="rightEyeStatus">ATTESA</div>
+                    <div class="sensor-metric">
+                        <span>EAR</span>
+                        <strong id="rightEyeEar">0.000</strong>
+                    </div>
+                </article>
+
+                <article class="sensor-card" id="mouthCard">
+                    <div class="sensor-header">
+                        <h2>Bocca</h2>
+                        <span class="sensor-dot"></span>
+                    </div>
+                    <div class="sensor-state" id="mouthStatus">ATTESA</div>
+                    <div class="sensor-metric">
+                        <span>MAR</span>
+                        <strong id="mouthMar">0.000</strong>
+                    </div>
+                </article>
+            </div>
+
+            <div class="profile-card">
+                <div class="card-topline">
+                    <span class="card-kicker">Profilo validato</span>
+                    <span class="card-status">Pronto per il test</span>
+                </div>
+                <ul class="profile-list">
+                    <li id="earProfile">Chiusura occhi intenzionale sotto EAR 0.13</li>
+                    <li id="marProfile">Scroll con bocca sopra MAR 0.17</li>
+                    <li id="glassesProfile">Smoothing e soglie ottimizzate per utilizzo con occhiali</li>
+                </ul>
+            </div>
+
+            <div class="control-card">
+                <div class="card-topline">
+                    <span class="card-kicker">Test rapido</span>
+                    <span class="card-status">Simulazione senza attese</span>
+                </div>
+
+                <div class="control-grid">
+                    <button id="simulateScrollBtn" class="action-btn accent">Simula scroll bocca</button>
+                    <button id="simulateSelectBtn" class="action-btn accent">Simula chiusura occhi</button>
+                    <button id="simulateConfirmBtn" class="action-btn accent">Simula conferma</button>
+                    <button id="runDemoBtn" class="action-btn secondary">Esegui demo automatica</button>
+                    <button id="resetFlowBtn" class="action-btn secondary">Resetta domanda</button>
+                </div>
+            </div>
+
+            <div class="feedback-grid">
+                <article class="mini-card">
+                    <span>EAR medio</span>
+                    <strong id="avgEarValue">0.000</strong>
+                </article>
+                <article class="mini-card">
+                    <span>MAR live</span>
+                    <strong id="liveMarValue">0.000</strong>
+                </article>
+                <article class="mini-card">
+                    <span>Comando rilevato</span>
+                    <strong id="commandState">In attesa</strong>
+                </article>
+                <article class="mini-card">
+                    <span>Fase test</span>
+                    <strong id="phaseState">Lettura</strong>
+                </article>
+            </div>
+
+            <div class="log-card">
+                <div class="card-topline">
+                    <span class="card-kicker">Log del processo</span>
+                    <span class="card-status">Ultimi eventi</span>
+                </div>
+                <ul id="eventLog" class="event-log"></ul>
+            </div>
+        </section>
     </div>
 
     <script src="app.js"></script>
 </body>
 
 </html>
-
-
-

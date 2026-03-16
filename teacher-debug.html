@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ric_Facc | Debug docente</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="teacher.css">
+</head>
+
+<body class="teacher-body">
+    <div class="debug-shell">
+        <header class="hero-panel teacher-hero">
+            <div class="hero-copy">
+                <p class="eyebrow">Debug docente</p>
+                <h1>Telemetria tecnica del quiz</h1>
+                <p class="hero-text">
+                    Questa finestra mostra metriche sensore, stato macchina ed eventi recenti ricevuti dal quiz studente.
+                </p>
+                <div class="hero-link-row">
+                    <a class="action-btn secondary" href="teacher.html" target="_blank" rel="noopener">
+                        Apri pannello docente
+                    </a>
+                </div>
+            </div>
+
+            <div class="hero-badges">
+                <div class="hero-badge">
+                    <span>Connessione</span>
+                    <strong id="teacherDebugConnectionStatus">In attesa</strong>
+                </div>
+                <div class="hero-badge">
+                    <span>Fase quiz</span>
+                    <strong id="teacherDebugPhaseBadge">-</strong>
+                </div>
+                <div class="hero-badge">
+                    <span>Domanda</span>
+                    <strong id="teacherDebugQuestionBadge">-</strong>
+                </div>
+            </div>
+        </header>
+
+        <main class="debug-grid">
+            <section class="debug-column">
+                <div class="control-card">
+                    <div class="card-topline">
+                        <span class="card-kicker">Metriche sensori</span>
+                        <span class="card-status" id="teacherDebugLastUpdate">Nessun dato ricevuto</span>
+                    </div>
+
+                    <div class="feedback-grid teacher-feedback-grid">
+                        <article class="mini-card">
+                            <span>EAR sx</span>
+                            <strong id="teacherDebugLeftEar">0.000</strong>
+                        </article>
+                        <article class="mini-card">
+                            <span>EAR dx</span>
+                            <strong id="teacherDebugRightEar">0.000</strong>
+                        </article>
+                        <article class="mini-card">
+                            <span>EAR medio</span>
+                            <strong id="teacherDebugAverageEar">0.000</strong>
+                        </article>
+                        <article class="mini-card">
+                            <span>MAR</span>
+                            <strong id="teacherDebugMar">0.000</strong>
+                        </article>
+                    </div>
+                </div>
+
+                <div class="sensor-grid">
+                    <article class="sensor-card" id="teacherDebugLeftEyeCard">
+                        <div class="sensor-header">
+                            <h2>Occhio sinistro</h2>
+                            <span class="sensor-dot"></span>
+                        </div>
+                        <div class="sensor-state" id="teacherDebugLeftEyeStatus">ATTESA</div>
+                        <div class="sensor-metric">
+                            <span>Soglia</span>
+                            <strong id="teacherDebugEarThreshold">0.000</strong>
+                        </div>
+                    </article>
+
+                    <article class="sensor-card" id="teacherDebugRightEyeCard">
+                        <div class="sensor-header">
+                            <h2>Occhio destro</h2>
+                            <span class="sensor-dot"></span>
+                        </div>
+                        <div class="sensor-state" id="teacherDebugRightEyeStatus">ATTESA</div>
+                        <div class="sensor-metric">
+                            <span>Soglia</span>
+                            <strong id="teacherDebugRightEarThreshold">0.000</strong>
+                        </div>
+                    </article>
+
+                    <article class="sensor-card" id="teacherDebugMouthCard">
+                        <div class="sensor-header">
+                            <h2>Bocca</h2>
+                            <span class="sensor-dot"></span>
+                        </div>
+                        <div class="sensor-state" id="teacherDebugMouthStatus">ATTESA</div>
+                        <div class="sensor-metric">
+                            <span>Soglia</span>
+                            <strong id="teacherDebugMarThreshold">0.000</strong>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <section class="debug-column">
+                <div class="quiz-card">
+                    <div class="quiz-header">
+                        <div>
+                            <p class="eyebrow">Stato tecnico</p>
+                            <h2 id="teacherDebugQuestionTitle">In attesa del quiz</h2>
+                        </div>
+                        <div class="state-pill" id="teacherDebugStatePill">LETTURA</div>
+                    </div>
+
+                    <div class="instruction-bar">
+                        <span id="teacherDebugQuestionCounter">-</span>
+                        <strong id="teacherDebugQuestionPrompt">Avvia il quiz studente e il server locale per vedere la telemetria.</strong>
+                    </div>
+
+                    <div class="status-grid-compact">
+                        <article class="mini-card">
+                            <span>Webcam</span>
+                            <strong id="teacherDebugCameraState">-</strong>
+                        </article>
+                        <article class="mini-card">
+                            <span>Comando live</span>
+                            <strong id="teacherDebugCommandState">-</strong>
+                        </article>
+                        <article class="mini-card">
+                            <span>Stato macchina</span>
+                            <strong id="teacherDebugMachineState">-</strong>
+                        </article>
+                        <article class="mini-card">
+                            <span>Face detected</span>
+                            <strong id="teacherDebugFaceDetected">No</strong>
+                        </article>
+                    </div>
+                </div>
+
+                <div class="profile-card">
+                    <div class="card-topline">
+                        <span class="card-kicker">Profilo rilevato</span>
+                        <span class="card-status" id="teacherDebugProfileStatus">-</span>
+                    </div>
+                    <ul class="profile-list">
+                        <li id="teacherDebugEarProfile">Soglia EAR non disponibile.</li>
+                        <li id="teacherDebugMarProfile">Soglia MAR non disponibile.</li>
+                        <li id="teacherDebugGlassesProfile">Modalita occhiali non disponibile.</li>
+                    </ul>
+                </div>
+
+                <div class="log-card">
+                    <div class="card-topline">
+                        <span class="card-kicker">Eventi recenti</span>
+                        <span class="card-status">Ultimi passaggi registrati dal quiz</span>
+                    </div>
+                    <ul class="event-log" id="teacherDebugEventLog"></ul>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="teacher-debug.js"></script>
+</body>
+
+</html>

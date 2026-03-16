@@ -22,9 +22,14 @@
                 <p class="eyebrow">Pannello docente</p>
                 <h1>Controllo live del quiz da tablet</h1>
                 <p class="hero-text">
-                    Il professore puo vedere in tempo reale cosa sta facendo il ragazzo, inviare comandi al PC e
-                    pubblicare nuove domande subito o in coda.
+                    Il professore puo seguire la sessione, inviare comandi al PC e pubblicare nuove domande.
+                    La telemetria tecnica e i log di debug sono disponibili in una finestra dedicata.
                 </p>
+                <div class="hero-link-row">
+                    <a class="action-btn secondary" href="teacher-debug.html" target="_blank" rel="noopener">
+                        Apri debug docente
+                    </a>
+                </div>
             </div>
 
             <div class="hero-badges">
@@ -79,40 +84,6 @@
                     </article>
 
                     <div class="teacher-choice-list" id="teacherChoiceList"></div>
-                </div>
-
-                <div class="control-card teacher-metrics-card">
-                    <div class="card-topline">
-                        <span class="card-kicker">Sensori live</span>
-                        <span class="card-status">Aggiornamento automatico</span>
-                    </div>
-
-                    <div class="feedback-grid teacher-feedback-grid">
-                        <article class="mini-card">
-                            <span>EAR sx</span>
-                            <strong id="teacherLeftEar">0.000</strong>
-                        </article>
-                        <article class="mini-card">
-                            <span>EAR dx</span>
-                            <strong id="teacherRightEar">0.000</strong>
-                        </article>
-                        <article class="mini-card">
-                            <span>EAR medio</span>
-                            <strong id="teacherAverageEar">0.000</strong>
-                        </article>
-                        <article class="mini-card">
-                            <span>MAR</span>
-                            <strong id="teacherMar">0.000</strong>
-                        </article>
-                    </div>
-                </div>
-
-                <div class="log-card teacher-log-card">
-                    <div class="card-topline">
-                        <span class="card-kicker">Eventi recenti</span>
-                        <span class="card-status">Ultimi passaggi registrati dal quiz</span>
-                    </div>
-                    <ul class="event-log" id="teacherEventLog"></ul>
                 </div>
             </section>
 

@@ -178,7 +178,9 @@ function printAvailableUrls() {
     const urls = new Set([
         `http://localhost:${PORT}/`,
         `http://127.0.0.1:${PORT}/`,
-        `http://localhost:${PORT}/teacher.html`
+        `http://localhost:${PORT}/teacher.html`,
+        `http://localhost:${PORT}/debug.html`,
+        `http://localhost:${PORT}/teacher-debug.html`
     ]);
 
     Object.values(interfaces).forEach((addresses) => {
@@ -186,6 +188,8 @@ function printAvailableUrls() {
             if (address.family === 'IPv4' && !address.internal) {
                 urls.add(`http://${address.address}:${PORT}/`);
                 urls.add(`http://${address.address}:${PORT}/teacher.html`);
+                urls.add(`http://${address.address}:${PORT}/debug.html`);
+                urls.add(`http://${address.address}:${PORT}/teacher-debug.html`);
             }
         });
     });
@@ -216,6 +220,16 @@ const server = http.createServer((request, response) => {
 
     if (url.pathname === '/teacher') {
         serveStaticFile('/teacher.html', response);
+        return;
+    }
+
+    if (url.pathname === '/debug') {
+        serveStaticFile('/debug.html', response);
+        return;
+    }
+
+    if (url.pathname === '/teacher-debug') {
+        serveStaticFile('/teacher-debug.html', response);
         return;
     }
 

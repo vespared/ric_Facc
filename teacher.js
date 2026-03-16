@@ -81,6 +81,9 @@ function setActionStatus(message, isError = false) {
 }
 
 function setMetric(element, value) {
+    if (!element) {
+        return;
+    }
     const numericValue = Number(value);
     element.textContent = Number.isFinite(numericValue) ? numericValue.toFixed(3) : '0.000';
 }
@@ -136,6 +139,9 @@ function renderChoices(snapshot) {
 }
 
 function renderEvents(snapshot) {
+    if (!teacherEventLog) {
+        return;
+    }
     const events = Array.isArray(snapshot.events) ? snapshot.events : [];
     if (events.length === 0) {
         teacherEventLog.innerHTML = '<li><span class="log-time">--:--:--</span><span class="log-text">Nessun evento disponibile.</span></li>';
@@ -198,7 +204,9 @@ function renderDisconnectedState(message) {
     teacherQuestionTitle.textContent = 'In attesa del quiz sul PC';
     teacherQuestionPrompt.textContent = 'Apri il quiz del ragazzo con il server locale attivo e mantieni questa pagina sulla stessa rete.';
     teacherChoiceList.innerHTML = '';
-    teacherEventLog.innerHTML = '<li><span class="log-time">--:--:--</span><span class="log-text">Nessun evento disponibile.</span></li>';
+    if (teacherEventLog) {
+        teacherEventLog.innerHTML = '<li><span class="log-time">--:--:--</span><span class="log-text">Nessun evento disponibile.</span></li>';
+    }
     setMetric(teacherLeftEar, 0);
     setMetric(teacherRightEar, 0);
     setMetric(teacherAverageEar, 0);

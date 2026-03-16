@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ric_Facc | Sessione sviluppatore</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="debug-shell">
+        <header class="hero-panel">
+            <div class="hero-copy">
+                <p class="eyebrow">Sessione sviluppatore</p>
+                <h1>Tracking e telemetria live</h1>
+                <p class="hero-text">
+                    Qui trovi webcam, zoom occhi, landmark, valori EAR/MAR, log e comandi di prova.
+                    La schermata principale del quiz resta libera da informazioni di debug.
+                </p>
+                <div class="hero-link-row">
+                    <a class="action-btn secondary" href="index.html" target="_blank" rel="noopener">
+                        Apri sessione quiz
+                    </a>
+                </div>
+            </div>
+
+            <div class="hero-badges">
+                <div class="hero-badge">
+                    <span>Connessione</span>
+                    <strong id="debugConnectionStatus">In attesa</strong>
+                </div>
+                <div class="hero-badge">
+                    <span>Fase quiz</span>
+                    <strong id="debugPhaseBadge">-</strong>
+                </div>
+                <div class="hero-badge">
+                    <span>Domanda</span>
+                    <strong id="debugQuestionBadge">-</strong>
+                </div>
+            </div>
+        </header>
+
+        <main class="debug-grid">
+            <section class="debug-column">
+                <div class="video-card">
+                    <div class="card-topline">
+                        <span class="card-kicker">Tracking live</span>
+                        <span class="card-status" id="debugCameraState">Webcam non avviata</span>
+                    </div>
+
+                    <div class="debug-frame-grid">
+                        <div class="debug-frame debug-frame--tracking">
+                            <img id="debugTrackingFrame" class="debug-frame-image is-mirrored" alt="Tracking facciale live">
+                            <div id="debugTrackingEmpty" class="debug-frame-empty">In attesa del feed video dal quiz.</div>
+                        </div>
+
+                        <div class="debug-frame debug-frame--zoom">
+                            <img id="debugZoomFrame" class="debug-frame-image" alt="Dettaglio occhi">
+                            <div id="debugZoomEmpty" class="debug-frame-empty">Lo zoom occhi apparira qui quando il tracking e attivo.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sensor-grid">
+                    <article class="sensor-card" id="debugLeftEyeCard">
+                        <div class="sensor-header">
+                            <h2>Occhio sinistro</h2>
+                            <span class="sensor-dot"></span>
+                        </div>
+                        <div class="sensor-state" id="debugLeftEyeStatus">ATTESA</div>
+                        <div class="sensor-metric">
+                            <span>EAR</span>
+                            <strong id="debugLeftEyeValue">0.000</strong>
+                        </div>
+                    </article>
+
+                    <article class="sensor-card" id="debugRightEyeCard">
+                        <div class="sensor-header">
+                            <h2>Occhio destro</h2>
+                            <span class="sensor-dot"></span>
+                        </div>
+                        <div class="sensor-state" id="debugRightEyeStatus">ATTESA</div>
+                        <div class="sensor-metric">
+                            <span>EAR</span>
+                            <strong id="debugRightEyeValue">0.000</strong>
+                        </div>
+                    </article>
+
+                    <article class="sensor-card" id="debugMouthCard">
+                        <div class="sensor-header">
+                            <h2>Bocca</h2>
+                            <span class="sensor-dot"></span>
+                        </div>
+                        <div class="sensor-state" id="debugMouthStatus">ATTESA</div>
+                        <div class="sensor-metric">
+                            <span>MAR</span>
+                            <strong id="debugMouthValue">0.000</strong>
+                        </div>
+                    </article>
+                </div>
+
+                <div class="feedback-grid">
+                    <article class="mini-card">
+                        <span>EAR medio</span>
+                        <strong id="debugAverageEar">0.000</strong>
+                    </article>
+                    <article class="mini-card">
+                        <span>MAR live</span>
+                        <strong id="debugMarLive">0.000</strong>
+                    </article>
+                    <article class="mini-card">
+                        <span>Comando live</span>
+                        <strong id="debugCommandState">In attesa</strong>
+                    </article>
+                    <article class="mini-card">
+                        <span>Face detected</span>
+                        <strong id="debugFaceDetected">No</strong>
+                    </article>
+                </div>
+
+                <div class="profile-card">
+                    <div class="card-topline">
+                        <span class="card-kicker">Profilo validato</span>
+                        <span class="card-status" id="debugThresholdSummary">EAR 0.13 / MAR 0.17</span>
+                    </div>
+                    <ul class="profile-list">
+                        <li id="debugEarProfile">Chiusura occhi intenzionale sotto EAR 0.13</li>
+                        <li id="debugMarProfile">Scroll con bocca sopra MAR 0.17</li>
+                        <li id="debugGlassesProfile">Smoothing e soglie ottimizzate per utilizzo con occhiali</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="debug-column">
+                <div class="quiz-card">
+                    <div class="quiz-header">
+                        <div>
+                            <p class="eyebrow">Stato live del quiz</p>
+                            <h2 id="debugQuestionTitle">In attesa del quiz</h2>
+                        </div>
+                        <div class="state-pill" id="debugStatePill">LETTURA</div>
+                    </div>
+
+                    <div class="instruction-bar">
+                        <span id="debugQuestionCounter">-</span>
+                        <strong id="debugQuestionPrompt">Apri il quiz principale per iniziare la sessione.</strong>
+                    </div>
+
+                    <div class="status-grid-compact">
+                        <article class="mini-card">
+                            <span>Stato macchina</span>
+                            <strong id="debugMachineState">-</strong>
+                        </article>
+                        <article class="mini-card">
+                            <span>Ultimo update</span>
+                            <strong id="debugLastUpdate">-</strong>
+                        </article>
+                    </div>
+                </div>
+
+                <div class="control-card">
+                    <div class="card-topline">
+                        <span class="card-kicker">Controlli sviluppatore</span>
+                        <span class="card-status" id="debugActionStatus">Pronto</span>
+                    </div>
+
+                    <div class="control-grid">
+                        <button id="debugStartCameraBtn" class="action-btn primary">Avvia webcam</button>
+                        <button id="debugReadQuestionBtn" class="action-btn secondary">Leggi domanda</button>
+                        <button id="debugSimulateScrollBtn" class="action-btn accent">Simula scroll bocca</button>
+                        <button id="debugSimulateSelectBtn" class="action-btn accent">Simula occhi</button>
+                        <button id="debugSimulateConfirmBtn" class="action-btn accent">Simula conferma</button>
+                        <button id="debugRunDemoBtn" class="action-btn secondary">Esegui demo automatica</button>
+                        <button id="debugResetBtn" class="action-btn secondary">Resetta domanda</button>
+                    </div>
+                </div>
+
+                <div class="network-card">
+                    <div class="card-topline">
+                        <span class="card-kicker">Rete e sessione docente</span>
+                        <span class="card-status" id="debugRemoteStatus">In attesa</span>
+                    </div>
+                    <p class="debug-note">
+                        Questa finestra riceve lo stato direttamente dalla sessione quiz aperta sul PC.
+                    </p>
+                    <div class="network-hint" id="debugTeacherUrl">Pannello docente non ancora disponibile.</div>
+                </div>
+
+                <div class="log-card">
+                    <div class="card-topline">
+                        <span class="card-kicker">Log di debug</span>
+                        <span class="card-status">Ultimi eventi dal quiz</span>
+                    </div>
+                    <ul id="debugEventLog" class="event-log"></ul>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="debug.js"></script>
+</body>
+
+</html>

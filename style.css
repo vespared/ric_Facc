@@ -44,6 +44,12 @@ select {
     padding: 28px clamp(18px, 3vw, 36px) 40px;
 }
 
+.debug-shell {
+    width: min(1480px, 100%);
+    margin: 0 auto;
+    padding: 28px clamp(18px, 3vw, 36px) 40px;
+}
+
 .hero-panel,
 .video-card,
 .zoom-card,
@@ -85,6 +91,13 @@ select {
 .hero-copy {
     position: relative;
     z-index: 1;
+}
+
+.hero-link-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 20px;
 }
 
 .eyebrow,
@@ -143,10 +156,129 @@ select {
     gap: 22px;
 }
 
+.main-grid--quiz {
+    grid-template-columns: minmax(0, 1fr);
+}
+
 .sensor-column,
 .experience-column {
     display: grid;
     gap: 18px;
+}
+
+.experience-column--wide {
+    width: min(1040px, 100%);
+    margin: 0 auto;
+}
+
+.session-toolbar {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    align-items: center;
+    padding: 20px 22px;
+    border-radius: 24px;
+    backdrop-filter: blur(18px);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+}
+
+.session-toolbar h2 {
+    font-size: clamp(1.3rem, 2.4vw, 1.9rem);
+    margin-top: 8px;
+}
+
+.session-toolbar-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.developer-bridge-hidden {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.debug-grid {
+    display: grid;
+    grid-template-columns: minmax(360px, 0.95fr) minmax(0, 1.1fr);
+    gap: 22px;
+}
+
+.debug-column {
+    display: grid;
+    gap: 18px;
+    align-content: start;
+}
+
+.debug-frame-grid {
+    display: grid;
+    gap: 16px;
+}
+
+.debug-frame {
+    position: relative;
+    overflow: hidden;
+    border-radius: 22px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    background:
+        radial-gradient(circle at 20% 20%, rgba(45, 226, 230, 0.16), transparent 28%),
+        linear-gradient(145deg, #08111f, #152a4a);
+}
+
+.debug-frame--tracking {
+    aspect-ratio: 4 / 3;
+}
+
+.debug-frame--zoom {
+    aspect-ratio: 2 / 1;
+}
+
+.debug-frame-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.debug-frame-image.is-mirrored {
+    transform: scaleX(-1);
+}
+
+.debug-frame-empty {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    text-align: center;
+    color: var(--muted);
+    background: rgba(3, 9, 18, 0.72);
+}
+
+.debug-frame-empty.hidden {
+    display: none;
+}
+
+.status-grid-compact {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.debug-note {
+    color: var(--muted);
+    line-height: 1.6;
 }
 
 .video-card,
@@ -749,6 +881,10 @@ select {
         grid-template-columns: 1fr;
     }
 
+    .debug-grid {
+        grid-template-columns: 1fr;
+    }
+
     .sensor-grid,
     .feedback-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -760,7 +896,12 @@ select {
         padding: 18px 14px 28px;
     }
 
+    .debug-shell {
+        padding: 18px 14px 28px;
+    }
+
     .hero-panel,
+    .session-toolbar,
     .card-topline,
     .quiz-header,
     .instruction-bar,
@@ -781,11 +922,21 @@ select {
     }
 
     .sensor-grid,
+    .status-grid-compact,
     .choices-grid,
     .feedback-grid,
     .control-grid,
     .video-actions {
         grid-template-columns: 1fr;
+    }
+
+    .session-toolbar-actions {
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .session-toolbar-actions .action-btn {
+        width: 100%;
     }
 
     .state-pill {
