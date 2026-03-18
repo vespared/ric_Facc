@@ -176,31 +176,88 @@ function handleApiRequest(request, response, url) {
     return false;
 }
 
+function isPrivateIpv4(address) {
+    if (address.startsWith('10.')) {
+        return true;
+    }
+
+    if (address.startsWith('192.168.')) {
+        return true;
+    }
+
+    const parts = address.split('.');
+    if (parts.length !== 4) {
+        return false;
+    }
+
+    const first = Number(parts[0]);
+    const second = Number(parts[1]);
+    return first === 172 && second >= 16 && second <= 31;
+}
+
+function interfaceLooksVirtual(name) {
+    return /bluetooth|docker|hyper-v|loopback|nord|openvpn|tailscale|tun|virtual|vmware|vbox|vethernet|vpn|wsl/i.test(name);
+}
+
+function buildPageUrls(host) {
+    return [
+        `http://${host}:${PORT}/`,
+        `http://${host}:${PORT}/teacher.html`
+    ];
+}
+
 function printAvailableUrls() {
     const interfaces = os.networkInterfaces();
-    const urls = new Set([
-        `http://localhost:${PORT}/`,
-        `http://127.0.0.1:${PORT}/`,
-        `http://localhost:${PORT}/teacher.html`,
-        `http://localhost:${PORT}/debug.html`,
-        `http://localhost:${PORT}/teacher-debug.html`
-    ]);
+    const lanUrls = [];
+    const otherNetworkUrls = [];
 
-    Object.values(interfaces).forEach((addresses) => {
+    Object.entries(interfaces).forEach(([name, addresses]) => {
         (addresses || []).forEach((address) => {
-            if (address.family === 'IPv4' && !address.internal) {
-                urls.add(`http://${address.address}:${PORT}/`);
-                urls.add(`http://${address.address}:${PORT}/teacher.html`);
-                urls.add(`http://${address.address}:${PORT}/debug.html`);
-                urls.add(`http://${address.address}:${PORT}/teacher-debug.html`);
+            if (address.family !== 'IPv4' || address.internal) {
+                return;
+            }
+
+            const entry = {
+                name,
+                address: address.address,
+                urls: buildPageUrls(address.address)
+            };
+
+            const isLikelyLan = isPrivateIpv4(address.address) && !interfaceLooksVirtual(name);
+            if (isLikelyLan) {
+                lanUrls.push(entry);
+            } else {
+                otherNetworkUrls.push(entry);
             }
         });
     });
 
     console.log('');
     console.log('Server Ric_Facc attivo.');
-    console.log('Apri il quiz studente sul PC e il pannello docente sul tablet usando uno di questi URL:');
-    urls.forEach((entry) => console.log(`- ${entry}`));
+    console.log('Apri il quiz studente sul PC con uno di questi URL locali:');
+    buildPageUrls('localhost').forEach((entry) => console.log(`- ${entry}`));
+    console.log('');
+
+    if (lanUrls.length > 0) {
+        console.log('URL consigliati per telefono o tablet sulla stessa rete Wi-Fi/LAN:');
+        lanUrls.forEach((entry) => {
+            console.log(`- ${entry.urls[0]}  [${entry.name}]`);
+            console.log(`  docente: ${entry.urls[1]}`);
+        });
+        console.log('');
+    }
+
+    if (otherNetworkUrls.length > 0) {
+        console.log('Altri indirizzi rilevati (VPN o schede virtuali, di solito NON vanno usati dal tablet):');
+        otherNetworkUrls.forEach((entry) => console.log(`- ${entry.address}  [${entry.name}]`));
+        console.log('');
+    }
+
+    console.log('Se telefono o tablet non aprono la pagina:');
+    console.log('- verifica di usare un URL della sezione Wi-Fi/LAN');
+    console.log('- controlla che il PC e il tablet siano sulla stessa rete');
+    console.log('- se usi una VPN, prova a disattivarla');
+    console.log('- in Windows Firewall consenti Node.js sulle reti private');
     console.log('');
 }
 
@@ -237,6 +294,22 @@ const server = http.createServer((request, response) => {
     }
 
     serveStaticFile(url.pathname, response);
+});
+
+server.on('error', (error) => {
+    if (error && error.code === 'EADDRINUSE') {
+        console.error('');
+        console.error(`La porta ${PORT} e gia in uso.`);
+        console.error('Il server potrebbe essere gia attivo in un altra finestra.');
+        console.error('Chiudi l altro processo oppure avvia con una porta diversa, ad esempio:');
+        console.error(`set PORT=${PORT + 1} && node server.js`);
+        console.error('');
+        process.exit(1);
+        return;
+    }
+
+    console.error(error);
+    process.exit(1);
 });
 
 server.listen(PORT, '0.0.0.0', () => {
