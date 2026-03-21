@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ric_Facc | Manuale rapido</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,500;6..72,700&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="manuale.css">
+</head>
+
+<body class="manual-body">
+    <div class="manual-shell">
+        <header class="manual-hero" id="top">
+            <div class="manual-hero-copy">
+                <p class="manual-kicker">Manuale sintetico</p>
+                <h1>Ric_Facc: guida chiara per scuola, docenti e famiglia</h1>
+                <p class="manual-lead">
+                    Questo progetto trasforma un quiz in un'esperienza accessibile: lo studente risponde con occhi e
+                    bocca, il docente puo seguire la sessione da tablet e la famiglia puo supportare l'utilizzo anche a
+                    casa.
+                </p>
+            </div>
+
+            <div class="manual-hero-panel">
+                <div class="manual-stat">
+                    <span>Uso studente</span>
+                    <strong>Volto + webcam</strong>
+                </div>
+                <div class="manual-stat">
+                    <span>Uso docente</span>
+                    <strong>Tablet in rete locale</strong>
+                </div>
+                <div class="manual-stat">
+                    <span>Materiali</span>
+                    <strong>XLSX, CSV, DOCX, JSON, TXT</strong>
+                </div>
+            </div>
+        </header>
+
+        <div class="manual-toolbar">
+            <div class="manual-filter-row" aria-label="Filtra il manuale">
+                <button class="manual-chip is-active" type="button" data-filter="all">Vista completa</button>
+                <button class="manual-chip" type="button" data-filter="teacher">Solo docenti</button>
+                <button class="manual-chip" type="button" data-filter="family">Solo famiglia</button>
+            </div>
+
+            <nav class="manual-nav" aria-label="Sezioni del manuale">
+                <button class="manual-nav-btn is-active" type="button" data-target="panoramica">Panoramica</button>
+                <button class="manual-nav-btn" type="button" data-target="avvio">Avvio</button>
+                <button class="manual-nav-btn" type="button" data-target="studente">Studente</button>
+                <button class="manual-nav-btn" type="button" data-target="docente">Docente</button>
+                <button class="manual-nav-btn" type="button" data-target="famiglia">Famiglia</button>
+                <button class="manual-nav-btn" type="button" data-target="rete">Rete e file</button>
+            </nav>
+
+            <div class="manual-action-row">
+                <a class="manual-action ghost" href="index.html">Apri quiz studente</a>
+                <a class="manual-action ghost" href="teacher.html">Apri pannello docente</a>
+                <button class="manual-action primary" type="button" id="printManualBtn">Stampa / PDF</button>
+            </div>
+        </div>
+
+        <main class="manual-main">
+            <section class="manual-section" id="panoramica" data-audience="all">
+                <div class="section-heading">
+                    <p class="manual-kicker">1. Panoramica</p>
+                    <h2>Che cosa fa il progetto</h2>
+                </div>
+
+                <div class="card-grid">
+                    <article class="manual-card accent-primary">
+                        <h3>Obiettivo</h3>
+                        <p>
+                            Permettere allo studente di partecipare a un quiz a risposta multipla tramite movimenti del
+                            volto, in modo controllato e comprensibile.
+                        </p>
+                    </article>
+
+                    <article class="manual-card">
+                        <h3>Per chi e pensato</h3>
+                        <p>
+                            Docenti, famiglie e studenti che hanno bisogno di una modalita di risposta accessibile,
+                            semplice da seguire e adatta al contesto scolastico.
+                        </p>
+                    </article>
+
+                    <article class="manual-card">
+                        <h3>Due ambienti principali</h3>
+                        <p>
+                            Il progetto ha una pagina studente, dedicata al quiz, e una pagina docente, utile per
+                            monitorare e guidare la sessione da remoto.
+                        </p>
+                    </article>
+                </div>
+
+                <div class="manual-card strip-card">
+                    <div class="strip-item">
+                        <span class="strip-step">A</span>
+                        <div>
+                            <strong>Studente</strong>
+                            <p>Legge la domanda e usa bocca e occhi per scegliere la risposta.</p>
+                        </div>
+                    </div>
+                    <div class="strip-item">
+                        <span class="strip-step">B</span>
+                        <div>
+                            <strong>Docente</strong>
+                            <p>Segue l'avanzamento e puo inviare comandi o nuove domande dal tablet.</p>
+                        </div>
+                    </div>
+                    <div class="strip-item">
+                        <span class="strip-step">C</span>
+                        <div>
+                            <strong>Famiglia</strong>
+                            <p>Prepara l'ambiente, supporta lo studente e verifica che l'uso sia sereno e stabile.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="manual-section" id="avvio" data-audience="all">
+                <div class="section-heading">
+                    <p class="manual-kicker">2. Avvio rapido</p>
+                    <h2>Come iniziare in pochi passaggi</h2>
+                </div>
+
+                <div class="journey-list">
+                    <article class="journey-step">
+                        <span class="journey-number">1</span>
+                        <div>
+                            <h3>Avvia il server locale</h3>
+                            <p>
+                                Esegui <code>node server.js</code> oppure il comando predisposto nel progetto per
+                                attivare la rete locale.
+                            </p>
+                        </div>
+                    </article>
+
+                    <article class="journey-step">
+                        <span class="journey-number">2</span>
+                        <div>
+                            <h3>Apri il quiz studente</h3>
+                            <p>
+                                Sul PC apri <code>/</code> o <code>index.html</code>, poi premi
+                                <strong>Avvia webcam</strong>.
+                            </p>
+                        </div>
+                    </article>
+
+                    <article class="journey-step">
+                        <span class="journey-number">3</span>
+                        <div>
+                            <h3>Apri il pannello docente</h3>
+                            <p>
+                                Sul tablet o su un altro dispositivo apri <code>/teacher.html</code> nella stessa rete
+                                del PC.
+                            </p>
+                        </div>
+                    </article>
+
+                    <article class="journey-step">
+                        <span class="journey-number">4</span>
+                        <div>
+                            <h3>Carica o prepara il test</h3>
+                            <p>
+                                Il quiz puo usare il test base gia incluso oppure un file importato da Excel, Word, CSV,
+                                JSON o TXT.
+                            </p>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <section class="manual-section" id="studente" data-audience="all family teacher">
+                <div class="section-heading">
+                    <p class="manual-kicker">3. Esperienza studente</p>
+                    <h2>Come funziona la risposta accessibile</h2>
+                </div>
+
+                <div class="callout-row">
+                    <article class="manual-card command-card">
+                        <span class="command-tag mouth">Bocca</span>
+                        <h3>Comando di avanzamento</h3>
+                        <p>Apre il flusso, scorre tra le risposte e conferma nel passaggio finale.</p>
+                    </article>
+
+                    <article class="manual-card command-card">
+                        <span class="command-tag eyes">Occhi</span>
+                        <h3>Comando di selezione</h3>
+                        <p>Con la chiusura intenzionale avvia la selezione oppure annulla nella fase di conferma.</p>
+                    </article>
+                </div>
+
+                <div class="journey-list">
+                    <article class="journey-step tone-warm">
+                        <span class="journey-number">1</span>
+                        <div>
+                            <h3>Lettura</h3>
+                            <p>La domanda e visibile. Lo studente puo leggere con calma senza attivare azioni involontarie.</p>
+                        </div>
+                    </article>
+
+                    <article class="journey-step tone-cool">
+                        <span class="journey-number">2</span>
+                        <div>
+                            <h3>Navigazione</h3>
+                            <p>Aprendo la bocca, il focus passa da una risposta all'altra in modo ordinato.</p>
+                        </div>
+                    </article>
+
+                    <article class="journey-step tone-neutral">
+                        <span class="journey-number">3</span>
+                        <div>
+                            <h3>Pre-selezione</h3>
+                            <p>Chiudendo gli occhi in modo intenzionale, parte una breve barra di caricamento della scelta.</p>
+                        </div>
+                    </article>
+
+                    <article class="journey-step tone-safe">
+                        <span class="journey-number">4</span>
+                        <div>
+                            <h3>Safe check</h3>
+                            <p>La risposta scelta viene mostrata chiaramente: bocca per confermare, occhi per annullare.</p>
+                        </div>
+                    </article>
+                </div>
+
+                <div class="card-grid">
+                    <article class="manual-card">
+                        <h3>Punti di forza</h3>
+                        <ul class="manual-list">
+                            <li>Riduce gli errori grazie alla conferma finale.</li>
+                            <li>Mantiene il quiz visivamente semplice per lo studente.</li>
+                            <li>Puo leggere la domanda ad alta voce con il pulsante dedicato.</li>
+                        </ul>
+                    </article>
+
+                    <article class="manual-card">
+                        <h3>Buone pratiche</h3>
+                        <ul class="manual-list">
+                            <li>Usare una luce frontale morbida e stabile.</li>
+                            <li>Posizionare la webcam all'altezza del volto.</li>
+                            <li>Ridurre movimenti e rumore intorno allo studente.</li>
+                        </ul>
+                    </article>
+                </div>
+            </section>
+
+            <section class="manual-section" id="docente" data-audience="all teacher">
+                <div class="section-heading">
+                    <p class="manual-kicker">4. Uso docente</p>
+                    <h2>Cosa puo fare il professore dal tablet</h2>
+                </div>
+
+                <div class="card-grid">
+                    <article class="manual-card accent-secondary">
+                        <h3>Monitoraggio live</h3>
+                        <p>
+                            Il docente vede stato webcam, fase del quiz, comando rilevato, numero della domanda e
+                            risposta evidenziata.
+                        </p>
+                    </article>
+
+                    <article class="manual-card">
+                        <h3>Comandi remoti</h3>
+                        <p>
+                            Puo avviare la webcam del PC, leggere la domanda, scorrere le opzioni, selezionare, confermare
+                            o resettare il flusso.
+                        </p>
+                    </article>
+
+                    <article class="manual-card">
+                        <h3>Domande nuove in tempo reale</h3>
+                        <p>
+                            Dal modulo docente puo pubblicare subito una nuova domanda oppure metterla in coda come
+                            prossima.
+                        </p>
+                    </article>
+                </div>
+
+                <div class="manual-card">
+                    <h3>Uso consigliato in classe</h3>
+                    <ul class="manual-list">
+                        <li>Preparare il quiz prima della lezione e verificare la rete locale.</li>
+                        <li>Tenere il tablet vicino per intervenire solo quando serve.</li>
+                        <li>Usare la funzione di lettura domanda quando e utile alleggerire il carico cognitivo.</li>
+                        <li>Inserire domande live per verifiche guidate o recupero personalizzato.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="manual-section" id="famiglia" data-audience="all family">
+                <div class="section-heading">
+                    <p class="manual-kicker">5. Uso famiglia</p>
+                    <h2>Come accompagnare l'utilizzo a casa</h2>
+                </div>
+
+                <div class="card-grid">
+                    <article class="manual-card accent-soft">
+                        <h3>Preparare l'ambiente</h3>
+                        <p>
+                            Scegliere una stanza tranquilla, con buona illuminazione e con il dispositivo ben fermo davanti
+                            allo studente.
+                        </p>
+                    </article>
+
+                    <article class="manual-card">
+                        <h3>Accompagnare senza sostituirsi</h3>
+                        <p>
+                            La famiglia puo leggere le istruzioni, ricordare i comandi principali e lasciare allo studente
+                            il tempo di completare ogni passaggio.
+                        </p>
+                    </article>
+
+                    <article class="manual-card">
+                        <h3>Osservare il comfort</h3>
+                        <p>
+                            Se il volto non viene rilevato bene, conviene correggere postura, distanza o luce prima di
+                            riprendere il quiz.
+                        </p>
+                    </article>
+                </div>
+
+                <div class="manual-card">
+                    <h3>Messaggio chiave per la famiglia</h3>
+                    <p>
+                        Il progetto non richiede velocita. Funziona meglio quando lo studente si sente tranquillo, quando
+                        i tempi sono rispettati e quando l'adulto offre supporto organizzativo piu che intervento diretto.
+                    </p>
+                </div>
+            </section>
+
+            <section class="manual-section" id="rete" data-audience="all family teacher">
+                <div class="section-heading">
+                    <p class="manual-kicker">6. Rete e materiali</p>
+                    <h2>File supportati e collegamento tra dispositivi</h2>
+                </div>
+
+                <div class="card-grid">
+                    <article class="manual-card">
+                        <h3>Formati supportati</h3>
+                        <ul class="manual-list">
+                            <li><code>.xlsx</code> e <code>.csv</code> per import da Excel.</li>
+                            <li><code>.docx</code> e <code>.txt</code> per import da Word o testo strutturato.</li>
+                            <li><code>.json</code> per test gia organizzati digitalmente.</li>
+                        </ul>
+                    </article>
+
+                    <article class="manual-card">
+                        <h3>Collegamento docente</h3>
+                        <ul class="manual-list">
+                            <li>PC e tablet devono stare nella stessa rete locale.</li>
+                            <li>Il quiz studente si apre con <code>/</code>.</li>
+                            <li>Il pannello docente si apre con <code>/teacher.html</code>.</li>
+                        </ul>
+                    </article>
+
+                    <article class="manual-card">
+                        <h3>Campi essenziali del quiz</h3>
+                        <ul class="manual-list">
+                            <li>Titolo della domanda.</li>
+                            <li>Testo della domanda.</li>
+                            <li>Quattro opzioni di risposta.</li>
+                            <li>Indicazione della risposta corretta.</li>
+                        </ul>
+                    </article>
+                </div>
+
+                <div class="manual-card checklist-card">
+                    <h3>Checklist finale prima dell'uso</h3>
+                    <div class="checklist-grid">
+                        <div class="check-item">Webcam funzionante e volto ben visibile.</div>
+                        <div class="check-item">Quiz caricato o domande pronte.</div>
+                        <div class="check-item">Server locale avviato se serve il tablet docente.</div>
+                        <div class="check-item">Studente informato su bocca = avanti, occhi = selezione.</div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="manuale.js"></script>
+</body>
+
+</html>

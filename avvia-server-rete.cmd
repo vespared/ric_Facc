@@ -2,6 +2,16 @@
 setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 
+where node >nul 2>nul
+if errorlevel 1 (
+    echo.
+    echo Node.js non e installato o non e disponibile nel PATH.
+    echo Avvia prima installa-ric-facc.cmd per preparare questo PC.
+    echo.
+    pause
+    exit /b 1
+)
+
 netstat -ano | findstr /R /C:":3000 .*LISTENING" >nul
 if not errorlevel 1 (
     echo.
