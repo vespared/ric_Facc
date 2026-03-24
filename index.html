@@ -24,67 +24,16 @@
 </head>
 
 <body>
-    <div class="app-shell">
-        <header class="hero-panel">
-            <div class="hero-copy">
-                <p class="eyebrow">Sessione quiz</p>
-                <h1>Kahoot accessibile a sguardo, occhi e bocca</h1>
-                <p class="hero-text">
-                    La schermata principale mostra solo il flusso del quiz. Tracking live, telemetria,
-                    log e strumenti sviluppatore sono disponibili in una sessione dedicata.
-                </p>
-                <div class="hero-link-row">
-                    <a class="action-btn secondary" href="manuale.html">
-                        Apri manuale rapido
-                    </a>
-                    <a class="action-btn secondary" href="debug.html" target="_blank" rel="noopener">
-                        Apri sessione sviluppatore
-                    </a>
-                </div>
-            </div>
-
-            <div class="hero-badges">
-                <div class="hero-badge">
-                    <span>EAR ottimale</span>
-                    <strong>0.13</strong>
-                </div>
-                <div class="hero-badge">
-                    <span>MAR ottimale</span>
-                    <strong>0.17</strong>
-                </div>
-                <div class="hero-badge">
-                    <span>Modalita occhiali</span>
-                    <strong>Attiva</strong>
-                </div>
-            </div>
-        </header>
-
+    <div class="app-shell app-shell--student">
         <main class="main-grid main-grid--quiz">
             <section class="experience-column experience-column--wide">
-                <div class="session-toolbar">
-                    <div>
-                        <p class="eyebrow">Controlli essenziali</p>
-                        <h2>Quiz studente</h2>
-                    </div>
-                    <div class="session-toolbar-actions">
-                        <button id="startBtn" class="action-btn primary">Avvia webcam</button>
-                        <button id="readQuestionBtn" class="action-btn secondary">Leggi domanda</button>
-                        <a class="action-btn secondary" href="manuale.html">
-                            Manuale
-                        </a>
-                        <a class="action-btn secondary" href="debug.html" target="_blank" rel="noopener">
-                            Debug live
-                        </a>
-                    </div>
-                </div>
-
-                <div class="quiz-card">
+                <div class="quiz-card quiz-card--student">
                     <div class="quiz-header">
                         <div>
-                            <p class="eyebrow">Simulazione processo di risposta</p>
-                            <h2 id="questionTitle">Domanda 1</h2>
+                            <p class="eyebrow">Sessione domanda</p>
+                            <h1 id="questionTitle">Domanda 1</h1>
                         </div>
-                        <div class="state-pill" id="systemState">LETTURA</div>
+                        <div class="state-pill student-hidden-ui" id="systemState" aria-hidden="true">LETTURA</div>
                     </div>
 
                     <div class="instruction-bar">
@@ -95,7 +44,7 @@
                     <article class="question-card">
                         <p class="question-label">Test Kahoot</p>
                         <p class="question-text" id="questionText"></p>
-                        <div class="command-strip">
+                        <div class="command-strip student-hidden-ui" aria-hidden="true">
                             <span class="command-chip mouth" id="mouthCommandLabel">Bocca: Scroll / Conferma</span>
                             <span class="command-chip eyes" id="eyesCommandLabel">Occhi: Seleziona / Annulla</span>
                         </div>
@@ -115,9 +64,14 @@
                             <div id="confirmProgressBar" class="confirm-progress-bar"></div>
                         </div>
                     </aside>
+
+                    <div class="student-quick-actions student-hidden-ui" aria-hidden="true">
+                        <button id="startBtn" class="action-btn primary">Avvia webcam</button>
+                        <button id="readQuestionBtn" class="action-btn secondary">Leggi domanda</button>
+                    </div>
                 </div>
 
-                <div class="import-card">
+                <div class="import-card student-hidden-ui" aria-hidden="true">
                     <div class="card-topline">
                         <span class="card-kicker">Importa domande</span>
                         <span class="card-status" id="importStatus">Formato consigliato: XLSX o CSV da Excel</span>
@@ -142,7 +96,7 @@
                     </ul>
                 </div>
 
-                <div class="network-card">
+                <div class="network-card student-hidden-ui" aria-hidden="true">
                     <div class="card-topline">
                         <span class="card-kicker">Supporto docente in rete</span>
                         <span class="card-status" id="remoteSyncStatus">Avvia il server locale per collegare il tablet docente</span>

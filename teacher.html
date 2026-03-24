@@ -17,39 +17,11 @@
 
 <body class="teacher-body">
     <div class="teacher-shell">
-        <header class="hero-panel teacher-hero">
-            <div class="hero-copy">
-                <p class="eyebrow">Pannello docente</p>
-                <h1>Controllo live del quiz da tablet</h1>
-                <p class="hero-text">
-                    Il professore puo seguire la sessione, inviare comandi al PC e pubblicare nuove domande.
-                    La telemetria tecnica e i log di debug sono disponibili in una finestra dedicata.
-                </p>
-                <div class="hero-link-row">
-                    <a class="action-btn secondary" href="manuale.html">
-                        Apri manuale rapido
-                    </a>
-                    <a class="action-btn secondary" href="teacher-debug.html" target="_blank" rel="noopener">
-                        Apri debug docente
-                    </a>
-                </div>
-            </div>
-
-            <div class="hero-badges">
-                <div class="hero-badge">
-                    <span>Connessione</span>
-                    <strong id="teacherConnectionStatus">In attesa</strong>
-                </div>
-                <div class="hero-badge">
-                    <span>Fase studente</span>
-                    <strong id="teacherPhaseBadge">-</strong>
-                </div>
-                <div class="hero-badge">
-                    <span>Domanda</span>
-                    <strong id="teacherQuestionBadge">-</strong>
-                </div>
-            </div>
-        </header>
+        <section class="developer-bridge-hidden" aria-hidden="true" inert>
+            <strong id="teacherConnectionStatus">In attesa</strong>
+            <strong id="teacherPhaseBadge">-</strong>
+            <strong id="teacherQuestionBadge">-</strong>
+        </section>
 
         <main class="teacher-grid">
             <section class="teacher-column">

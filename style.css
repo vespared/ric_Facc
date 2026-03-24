@@ -44,6 +44,11 @@ select {
     padding: 28px clamp(18px, 3vw, 36px) 40px;
 }
 
+.app-shell--student {
+    width: min(980px, 100%);
+    padding-top: clamp(20px, 4vw, 40px);
+}
+
 .debug-shell {
     width: min(1480px, 100%);
     margin: 0 auto;
@@ -169,6 +174,10 @@ select {
 .experience-column--wide {
     width: min(1040px, 100%);
     margin: 0 auto;
+}
+
+.student-hidden-ui {
+    display: none;
 }
 
 .session-toolbar {
@@ -527,8 +536,33 @@ select {
         radial-gradient(circle at top right, rgba(255, 95, 162, 0.1), transparent 26%);
 }
 
+.quiz-card--student {
+    padding: clamp(20px, 4vw, 32px);
+}
+
 .quiz-header h2 {
     font-size: clamp(1.6rem, 3vw, 2.4rem);
+}
+
+.quiz-header h1 {
+    font-size: clamp(2rem, 5vw, 3rem);
+    line-height: 1;
+    margin-top: 8px;
+}
+
+.student-quick-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+}
+
+.student-quick-actions.student-hidden-ui {
+    display: none !important;
+}
+
+.student-quick-actions .action-btn {
+    flex: 1 1 220px;
 }
 
 .state-pill {
@@ -541,6 +575,10 @@ select {
     font-weight: 700;
     color: #04111c;
     background: linear-gradient(135deg, var(--yellow), #ffb547);
+}
+
+.state-pill.student-hidden-ui {
+    display: none !important;
 }
 
 .instruction-bar {
@@ -569,8 +607,8 @@ select {
 }
 
 .question-text {
-    font-size: clamp(1.25rem, 2.4vw, 1.9rem);
-    line-height: 1.35;
+    font-size: clamp(1.45rem, 2.7vw, 2.15rem);
+    line-height: 1.32;
     margin-top: 12px;
 }
 
@@ -579,6 +617,10 @@ select {
     gap: 10px;
     flex-wrap: wrap;
     margin-top: 18px;
+}
+
+.command-strip.student-hidden-ui {
+    display: none !important;
 }
 
 .command-chip {
@@ -677,8 +719,8 @@ select {
 }
 
 .choice-text {
-    font-size: 1.1rem;
-    line-height: 1.35;
+    font-size: 1.18rem;
+    line-height: 1.4;
     font-weight: 700;
 }
 
@@ -941,6 +983,10 @@ select {
 
     .state-pill {
         width: 100%;
+    }
+
+    .student-quick-actions {
+        flex-direction: column;
     }
 
     .choice-card {
