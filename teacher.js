@@ -31,6 +31,8 @@ const teacherConfirmBtn = document.getElementById('teacherConfirmBtn');
 const teacherResetBtn = document.getElementById('teacherResetBtn');
 const teacherPublishNowBtn = document.getElementById('teacherPublishNowBtn');
 const teacherQueueNextBtn = document.getElementById('teacherQueueNextBtn');
+const teacherPublishDocxBtn = document.getElementById('teacherPublishDocxBtn');
+const teacherQueueDocxBtn = document.getElementById('teacherQueueDocxBtn');
 
 const teacherQuestionTitleInput = document.getElementById('teacherQuestionTitleInput');
 const teacherQuestionPromptInput = document.getElementById('teacherQuestionPromptInput');
@@ -39,6 +41,8 @@ const teacherOptionBInput = document.getElementById('teacherOptionBInput');
 const teacherOptionCInput = document.getElementById('teacherOptionCInput');
 const teacherOptionDInput = document.getElementById('teacherOptionDInput');
 const teacherCorrectAnswerInput = document.getElementById('teacherCorrectAnswerInput');
+const teacherQuestionDocxInput = document.getElementById('teacherQuestionDocxInput');
+const teacherImportStatus = document.getElementById('teacherImportStatus');
 
 let snapshotTimer = null;
 let lastSentCommandId = 0;
@@ -61,9 +65,174 @@ function getCommandLabel(type) {
             return 'Pubblica subito';
         case 'queue-next':
             return 'Aggiungi come prossima';
+        case 'publish-batch':
+            return 'Pubblica file subito';
+        case 'queue-batch':
+            return 'Aggiungi file in coda';
         default:
             return type || 'Comando remoto';
     }
+}
+
+function normalizeHeader(value) {
+    return String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+}
+
+function resolveCorrectIndex(value, options, questionIndex) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        if (value >= 0 && value < options.length) {
+            return value;
+        }
+        if (value >= 1 && value <= options.length) {
+            return value - 1;
+        }
+    }
+
+    const normalized = String(value || '').trim();
+    const upper = normalized.toUpperCase();
+    const numeric = Number.parseInt(normalized, 10);
+
+    if (OPTION_LETTERS.includes(upper)) {
+        return OPTION_LETTERS.indexOf(upper);
+    }
+
+    if (!Number.isNaN(numeric)) {
+        if (numeric >= 1 && numeric <= options.length) {
+            return numeric - 1;
+        }
+        if (numeric >= 0 && numeric < options.length) {
+            return numeric;
+        }
+    }
+
+    const matchedByText = options.findIndex((option) => option.toLowerCase() === normalized.toLowerCase());
+    if (matchedByText >= 0) {
+        return matchedByText;
+    }
+
+    throw new Error(`Domanda ${questionIndex + 1}: risposta corretta non valida.`);
+}
+
+function normalizeQuestion(rawQuestion, index) {
+    const title = String(rawQuestion.title || `Domanda ${index + 1}`).trim();
+    const prompt = String(rawQuestion.prompt || rawQuestion.question || rawQuestion.domanda || '').trim();
+    const options = Array.isArray(rawQuestion.options)
+        ? rawQuestion.options.map((option) => String(option || '').trim())
+        : [rawQuestion.optionA || rawQuestion.a, rawQuestion.optionB || rawQuestion.b, rawQuestion.optionC || rawQuestion.c, rawQuestion.optionD || rawQuestion.d]
+            .map((option) => String(option || '').trim());
+
+    if (!prompt) {
+        throw new Error(`Domanda ${index + 1}: testo domanda mancante.`);
+    }
+
+    if (options.length !== 4 || options.some((option) => !option)) {
+        throw new Error(`Domanda ${index + 1}: servono esattamente 4 opzioni compilate.`);
+    }
+
+    return {
+        title,
+        prompt,
+        options,
+        correctIndex: resolveCorrectIndex(
+            rawQuestion.correctIndex ?? rawQuestion.correct ?? rawQuestion.corretta ?? rawQuestion.answer ?? rawQuestion.risposta,
+            options,
+            index
+        )
+    };
+}
+
+function splitQuestionBlocks(text) {
+    const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/);
+    const blocks = [];
+    let currentBlock = [];
+
+    lines.forEach((rawLine) => {
+        const line = rawLine.trim();
+        if (!line) {
+            return;
+        }
+
+        if (/^---+$/.test(line)) {
+            if (currentBlock.length > 0) {
+                blocks.push(currentBlock.join('\n'));
+                currentBlock = [];
+            }
+            return;
+        }
+
+        const separatorIndex = line.indexOf(':');
+        const key = separatorIndex >= 0 ? normalizeHeader(line.slice(0, separatorIndex)) : '';
+        const isQuestionStart = ['title', 'titolo'].includes(key);
+
+        if (isQuestionStart && currentBlock.length > 0) {
+            blocks.push(currentBlock.join('\n'));
+            currentBlock = [];
+        }
+
+        currentBlock.push(line);
+    });
+
+    if (currentBlock.length > 0) {
+        blocks.push(currentBlock.join('\n'));
+    }
+
+    return blocks.filter(Boolean);
+}
+
+function parseTxtQuestions(text) {
+    const blocks = splitQuestionBlocks(text);
+
+    if (blocks.length === 0) {
+        throw new Error('Il file Word non contiene domande valide.');
+    }
+
+    return blocks.map((block, index) => {
+        const rawQuestion = {};
+        block.split(/\r?\n/).forEach((line) => {
+            const separatorIndex = line.indexOf(':');
+            if (separatorIndex < 0) {
+                return;
+            }
+
+            const key = normalizeHeader(line.slice(0, separatorIndex));
+            const value = line.slice(separatorIndex + 1).trim();
+
+            if (['title', 'titolo'].includes(key)) {
+                rawQuestion.title = value;
+            } else if (['prompt', 'question', 'domanda', 'testo'].includes(key)) {
+                rawQuestion.prompt = value;
+            } else if (['a', 'optiona', 'opzionea'].includes(key)) {
+                rawQuestion.optionA = value;
+            } else if (['b', 'optionb', 'opzioneb'].includes(key)) {
+                rawQuestion.optionB = value;
+            } else if (['c', 'optionc', 'opzionec'].includes(key)) {
+                rawQuestion.optionC = value;
+            } else if (['d', 'optiond', 'opzioned'].includes(key)) {
+                rawQuestion.optionD = value;
+            } else if (['correct', 'corretta', 'answer', 'risposta'].includes(key)) {
+                rawQuestion.correct = value;
+            }
+        });
+
+        return normalizeQuestion(rawQuestion, index);
+    });
+}
+
+async function parseDocxQuestions(file) {
+    if (typeof mammoth === 'undefined') {
+        throw new Error('Libreria Word non disponibile nel browser.');
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    if (!result || !result.value || !result.value.trim()) {
+        throw new Error('Il file DOCX non contiene testo leggibile.');
+    }
+
+    return parseTxtQuestions(result.value);
 }
 
 function escapeHtml(value) {
@@ -75,15 +244,28 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
+function getFetchFailureMessage() {
+    if (window.location.protocol === 'file:') {
+        return 'Apri il pannello docente da http://localhost:3000/teacher.html oppure dall IP del PC, non come file locale.';
+    }
+
+    return 'Server docente non raggiungibile. Verifica che `node server.js` sia attivo e che questa pagina sia aperta da /teacher.html sulla stessa rete del PC.';
+}
+
 async function fetchJson(path, options = {}) {
-    const response = await fetch(path, {
-        ...options,
-        cache: 'no-store',
-        headers: {
-            'Content-Type': 'application/json',
-            ...(options.headers || {})
-        }
-    });
+    let response;
+    try {
+        response = await fetch(path, {
+            ...options,
+            cache: 'no-store',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(options.headers || {})
+            }
+        });
+    } catch (error) {
+        throw new Error(getFetchFailureMessage());
+    }
 
     const text = await response.text();
     const payload = text ? JSON.parse(text) : {};
@@ -103,6 +285,15 @@ function setConnectionStatus(message, isError = false) {
 function setActionStatus(message, isError = false) {
     teacherActionStatus.textContent = message;
     teacherActionStatus.style.color = isError ? 'var(--red)' : 'var(--muted)';
+}
+
+function setImportStatus(message, isError = false) {
+    if (!teacherImportStatus) {
+        return;
+    }
+
+    teacherImportStatus.textContent = message;
+    teacherImportStatus.style.color = isError ? 'var(--red)' : 'var(--muted)';
 }
 
 function setCommandDeliveryStatus(message, tone = 'muted') {
@@ -366,6 +557,33 @@ async function sendQuestionCommand(commandType) {
     }
 }
 
+async function sendDocxQuestionCommand(commandType) {
+    const file = teacherQuestionDocxInput.files && teacherQuestionDocxInput.files[0];
+    if (!file) {
+        setImportStatus('Seleziona prima un file Word.', true);
+        setActionStatus('Seleziona prima un file Word.', true);
+        return;
+    }
+
+    try {
+        setImportStatus(`Lettura di ${file.name} in corso...`);
+        const questions = await parseDocxQuestions(file);
+        await sendCommand(commandType, { questions });
+
+        const label = questions.length === 1 ? '1 domanda' : `${questions.length} domande`;
+        setImportStatus(`Import completato: ${file.name} (${label})`);
+        setActionStatus(
+            commandType === 'publish-batch'
+                ? `File Word pubblicato sul quiz: ${label}.`
+                : `File Word aggiunto in coda: ${label}.`
+        );
+        teacherQuestionDocxInput.value = '';
+    } catch (error) {
+        setImportStatus(`Errore import: ${error.message}`, true);
+        setActionStatus(error.message, true);
+    }
+}
+
 teacherStartCameraBtn.addEventListener('click', () => {
     void sendCommand('start-camera');
 });
@@ -398,12 +616,25 @@ teacherQueueNextBtn.addEventListener('click', () => {
     void sendQuestionCommand('queue-next');
 });
 
+if (teacherPublishDocxBtn) {
+    teacherPublishDocxBtn.addEventListener('click', () => {
+        void sendDocxQuestionCommand('publish-batch');
+    });
+}
+
+if (teacherQueueDocxBtn) {
+    teacherQueueDocxBtn.addEventListener('click', () => {
+        void sendDocxQuestionCommand('queue-batch');
+    });
+}
+
 window.addEventListener('beforeunload', () => {
     if (snapshotTimer) {
         window.clearInterval(snapshotTimer);
     }
 });
 
+setImportStatus('Formato richiesto: title, prompt, A, B, C, D, correct.');
 renderDisconnectedState('Connessione iniziale in corso...');
 void refreshSnapshot();
 snapshotTimer = window.setInterval(() => {

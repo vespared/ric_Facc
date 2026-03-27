@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ric_Facc | Pannello docente</title>
 
+    <script src="https://cdn.jsdelivr.net/npm/mammoth/mammoth.browser.min.js" crossorigin="anonymous"></script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap"
@@ -146,9 +148,38 @@
                         <button id="teacherQueueNextBtn" class="action-btn secondary">Aggiungi come prossima</button>
                     </div>
 
+                    <div class="teacher-import-box">
+                        <div class="card-topline">
+                            <span class="card-kicker">Importa da Word</span>
+                            <span class="card-status" id="teacherImportStatus">Carica un file .docx con il formato domande</span>
+                        </div>
+
+                        <label class="file-picker teacher-file-picker" for="teacherQuestionDocxInput">
+                            <span>Carica file Word</span>
+                            <strong>DOCX con una o piu domande</strong>
+                        </label>
+                        <input id="teacherQuestionDocxInput" class="file-input" type="file" accept=".docx">
+
+                        <div class="teacher-submit-grid">
+                            <button id="teacherPublishDocxBtn" class="action-btn primary">Pubblica file subito</button>
+                            <button id="teacherQueueDocxBtn" class="action-btn secondary">Aggiungi file in coda</button>
+                        </div>
+
+                        <pre class="teacher-format-example">title: Domanda 1
+prompt: Testo della domanda
+A: Prima risposta
+B: Seconda risposta
+C: Terza risposta
+D: Quarta risposta
+correct: A
+---
+title: Domanda 2</pre>
+                    </div>
+
                     <ul class="format-list teacher-note-list">
                         <li><strong>Pubblica subito:</strong> la nuova domanda entra immediatamente nel punto corrente del quiz.</li>
                         <li><strong>Aggiungi come prossima:</strong> la domanda viene messa in coda subito dopo quella attuale.</li>
+                        <li><strong>Formato Word:</strong> ogni domanda deve usare le righe <code>title</code>, <code>prompt</code>, <code>A</code>, <code>B</code>, <code>C</code>, <code>D</code> e <code>correct</code>, separate con <code>---</code>.</li>
                         <li><strong>Rete locale:</strong> tablet e PC devono essere collegati allo stesso server nella stessa rete.</li>
                     </ul>
                 </div>

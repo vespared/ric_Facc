@@ -593,6 +593,7 @@ select {
     color: var(--muted);
     margin-bottom: 14px;
     flex-wrap: wrap;
+    transition: box-shadow 0.22s ease, border-color 0.22s ease, background-color 0.22s ease;
 }
 
 .instruction-bar #questionCounter {
@@ -612,6 +613,12 @@ select {
     font-size: 0.98rem;
     line-height: 1.35;
     text-wrap: balance;
+    transition: color 0.22s ease, text-shadow 0.22s ease, background-color 0.22s ease;
+}
+
+.instruction-bar.is-being-read {
+    box-shadow: 0 0 0 1px rgba(45, 226, 230, 0.16), 0 12px 24px rgba(45, 226, 230, 0.1);
+    border-color: rgba(45, 226, 230, 0.32);
 }
 
 .question-card {
@@ -638,7 +645,8 @@ select {
 }
 
 .question-text.is-being-read,
-.choice-text.is-being-read {
+.choice-text.is-being-read,
+.instruction-bar strong.is-being-read {
     color: #ffffff;
     text-shadow: 0 0 18px rgba(255, 255, 255, 0.22);
     background: linear-gradient(120deg, rgba(255, 209, 102, 0.18), rgba(255, 255, 255, 0.06));

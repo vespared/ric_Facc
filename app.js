@@ -144,6 +144,7 @@ const elMouthCard = document.getElementById('mouthCard');
 const cameraState = document.getElementById('cameraState');
 const questionTitle = document.getElementById('questionTitle');
 const questionCounter = document.getElementById('questionCounter');
+const instructionBar = document.querySelector('.instruction-bar');
 const questionCard = document.querySelector('.question-card');
 const questionText = document.getElementById('questionText');
 const systemState = document.getElementById('systemState');
@@ -660,11 +661,41 @@ function parseXlsxQuestions(arrayBuffer) {
 }
 
 function splitQuestionBlocks(text) {
-    return text
-        .replace(/^\uFEFF/, '')
-        .split(/\r?\n\s*(?:---+)?\s*\r?\n(?=(?:title|titolo|prompt|question|domanda)\s*:)/i)
-        .map((block) => block.trim())
-        .filter(Boolean);
+    const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/);
+    const blocks = [];
+    let currentBlock = [];
+
+    lines.forEach((rawLine) => {
+        const line = rawLine.trim();
+        if (!line) {
+            return;
+        }
+
+        if (/^---+$/.test(line)) {
+            if (currentBlock.length > 0) {
+                blocks.push(currentBlock.join('\n'));
+                currentBlock = [];
+            }
+            return;
+        }
+
+        const separatorIndex = line.indexOf(':');
+        const key = separatorIndex >= 0 ? normalizeHeader(line.slice(0, separatorIndex)) : '';
+        const isQuestionStart = ['title', 'titolo'].includes(key);
+
+        if (isQuestionStart && currentBlock.length > 0) {
+            blocks.push(currentBlock.join('\n'));
+            currentBlock = [];
+        }
+
+        currentBlock.push(line);
+    });
+
+    if (currentBlock.length > 0) {
+        blocks.push(currentBlock.join('\n'));
+    }
+
+    return blocks.filter(Boolean);
 }
 
 function parseTxtQuestions(text) {
@@ -817,6 +848,17 @@ function insertQuestionIntoFlow(rawQuestion, insertIndex) {
     return questionSet[insertIndex];
 }
 
+function insertQuestionsIntoFlow(rawQuestions, insertIndex) {
+    const nextQuestions = questionSet.map((question) => ({
+        ...question,
+        options: [...question.options]
+    }));
+
+    nextQuestions.splice(insertIndex, 0, ...rawQuestions);
+    questionSet = cloneQuestionSet(nextQuestions);
+    return questionSet.slice(insertIndex, insertIndex + rawQuestions.length);
+}
+
 function publishQuestionNow(rawQuestion, source = 'Tablet docente') {
     const insertIndex = Math.min(Math.max(currentQuestionIndex, 0), questionSet.length);
     const insertedQuestion = insertQuestionIntoFlow(rawQuestion, insertIndex);
@@ -859,6 +901,64 @@ function queueQuestionAsNext(rawQuestion, source = 'Tablet docente') {
     updateImportStatus(`Domanda aggiunta in coda da ${source}`);
     logEvent(`${source}: aggiunta in coda ${insertedQuestion.title}.`);
     speakText(`Domanda del docente aggiunta come prossima domanda.`, {
+        interrupt: true,
+        rate: 1.02,
+        pitch: 1.04
+    });
+}
+
+function publishQuestionBatchNow(rawQuestions, source = 'Tablet docente') {
+    if (!Array.isArray(rawQuestions) || rawQuestions.length === 0) {
+        throw new Error('Nessuna domanda trovata nel file importato.');
+    }
+
+    const insertIndex = Math.min(Math.max(currentQuestionIndex, 0), questionSet.length);
+    const insertedQuestions = insertQuestionsIntoFlow(rawQuestions, insertIndex);
+    const firstQuestion = insertedQuestions[0];
+
+    simulationCompleted = false;
+    currentQuestionIndex = insertIndex;
+    resetCurrentFlow(false);
+    updateImportStatus(`File docente pubblicato da ${source} (${insertedQuestions.length} domande)`);
+    logEvent(`${source}: pubblicato file con ${insertedQuestions.length} domande. Ora attiva ${firstQuestion.title}.`);
+    speakText(`Nuovo file del docente pubblicato. ${firstQuestion.title}.`, {
+        interrupt: true,
+        rate: 1.03,
+        pitch: 1.05
+    });
+}
+
+function queueQuestionBatchAsNext(rawQuestions, source = 'Tablet docente') {
+    if (!Array.isArray(rawQuestions) || rawQuestions.length === 0) {
+        throw new Error('Nessuna domanda trovata nel file importato.');
+    }
+
+    const insertIndex = simulationCompleted
+        ? questionSet.length
+        : Math.min(currentQuestionIndex + 1, questionSet.length);
+    const insertedQuestions = insertQuestionsIntoFlow(rawQuestions, insertIndex);
+    const firstQuestion = insertedQuestions[0];
+
+    if (simulationCompleted) {
+        simulationCompleted = false;
+        currentQuestionIndex = insertIndex;
+        resetCurrentFlow(false);
+        updateImportStatus(`File docente aggiunto e aperto da ${source} (${insertedQuestions.length} domande)`);
+        logEvent(`${source}: il test riparte con un file da ${insertedQuestions.length} domande.`);
+        speakText(`Nuovo file del docente aggiunto. ${firstQuestion.title}.`, {
+            interrupt: true,
+            rate: 1.03,
+            pitch: 1.05
+        });
+        return;
+    }
+
+    updateQuestionHeader();
+    renderChoices();
+    updateStateUI();
+    updateImportStatus(`File docente aggiunto in coda da ${source} (${insertedQuestions.length} domande)`);
+    logEvent(`${source}: aggiunto file in coda con ${insertedQuestions.length} domande.`);
+    speakText('File del docente aggiunto come prossime domande.', {
         interrupt: true,
         rate: 1.02,
         pitch: 1.04
@@ -926,6 +1026,16 @@ async function executeRemoteCommand(command) {
     if (command.type === 'queue-next') {
         queueQuestionAsNext(payload.question || {}, 'Tablet docente');
         return 'Nuova domanda messa in coda sul PC.';
+    }
+
+    if (command.type === 'publish-batch') {
+        publishQuestionBatchNow(payload.questions || [], 'Tablet docente');
+        return 'File di domande pubblicato subito sul PC.';
+    }
+
+    if (command.type === 'queue-batch') {
+        queueQuestionBatchAsNext(payload.questions || [], 'Tablet docente');
+        return 'File di domande aggiunto in coda sul PC.';
     }
 
     return 'Comando remoto ricevuto.';
@@ -1508,7 +1618,14 @@ async function readCurrentQuestion() {
                 container: choiceButtons[index],
                 text: choiceButtons[index]?.querySelector('.choice-text')
             }
-        }))
+        })),
+        {
+            text: systemInstruction.textContent,
+            target: {
+                container: instructionBar,
+                text: systemInstruction
+            }
+        }
     ];
 
     logEvent('Lettura vocale della domanda attivata.');
