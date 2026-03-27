@@ -23,7 +23,9 @@ const state = {
     studentSnapshot: null,
     studentUpdatedAt: null,
     commands: [],
-    nextCommandId: 1
+    nextCommandId: 1,
+    latestAckedCommandId: 0,
+    lastStudentAck: null
 };
 
 function sendJson(response, statusCode, payload) {
@@ -111,7 +113,9 @@ function handleApiRequest(request, response, url) {
     if (request.method === 'GET' && url.pathname === '/api/student-state') {
         sendJson(response, 200, {
             snapshot: state.studentSnapshot,
-            updatedAt: state.studentUpdatedAt
+            updatedAt: state.studentUpdatedAt,
+            commandAck: state.lastStudentAck,
+            latestAckedCommandId: state.latestAckedCommandId
         });
         return true;
     }
@@ -161,15 +165,47 @@ function handleApiRequest(request, response, url) {
 
     if (request.method === 'GET' && url.pathname === '/api/commands') {
         const after = Number(url.searchParams.get('after') || 0);
-        const commands = state.commands.filter((command) => command.id > after);
+        const effectiveAfter = Math.max(after, state.latestAckedCommandId);
+        const commands = state.commands.filter((command) => command.id > effectiveAfter);
         const latestCommandId = state.commands.length > 0
             ? state.commands[state.commands.length - 1].id
             : 0;
 
         sendJson(response, 200, {
             commands,
-            latestCommandId
+            latestCommandId,
+            ackedCommandId: state.latestAckedCommandId
         });
+        return true;
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/command-ack') {
+        readRequestBody(request)
+            .then((body) => {
+                const payload = body ? JSON.parse(body) : {};
+                const commandId = Number(payload.id);
+                if (!Number.isFinite(commandId) || commandId <= 0) {
+                    throw new Error('ID comando non valido.');
+                }
+
+                state.latestAckedCommandId = Math.max(state.latestAckedCommandId, commandId);
+                state.lastStudentAck = {
+                    id: commandId,
+                    type: String(payload.type || ''),
+                    status: payload.status === 'error' ? 'error' : 'ok',
+                    message: String(payload.message || ''),
+                    ackedAt: new Date().toISOString()
+                };
+
+                sendJson(response, 200, {
+                    ok: true,
+                    ackedCommandId: state.latestAckedCommandId,
+                    commandAck: state.lastStudentAck
+                });
+            })
+            .catch((error) => {
+                sendJson(response, 400, { error: error.message || 'Ack comando non valido.' });
+            });
         return true;
     }
 

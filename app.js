@@ -144,6 +144,7 @@ const elMouthCard = document.getElementById('mouthCard');
 const cameraState = document.getElementById('cameraState');
 const questionTitle = document.getElementById('questionTitle');
 const questionCounter = document.getElementById('questionCounter');
+const questionCard = document.querySelector('.question-card');
 const questionText = document.getElementById('questionText');
 const systemState = document.getElementById('systemState');
 const systemInstruction = document.getElementById('systemInstruction');
@@ -192,6 +193,8 @@ let debugChannel = null;
 let debugLastFrameAt = 0;
 let remoteLastFrameAt = 0;
 let lastFaceDetected = false;
+let activeReadingSequenceId = 0;
+let remoteLastAckedCommandId = 0;
 
 const remoteEventHistory = [];
 
@@ -340,6 +343,21 @@ async function fetchJson(path, options = {}) {
     }
 
     return payload;
+}
+
+async function acknowledgeRemoteCommand(command, status, message) {
+    const response = await fetchJson('/api/command-ack', {
+        method: 'POST',
+        body: JSON.stringify({
+            id: command.id,
+            type: command.type,
+            status,
+            message
+        })
+    });
+
+    remoteLastAckedCommandId = Math.max(remoteLastAckedCommandId, Number(response.ackedCommandId || 0));
+    remoteLastCommandId = Math.max(remoteLastCommandId || 0, remoteLastAckedCommandId);
 }
 
 function captureDebugFrames() {
@@ -851,57 +869,66 @@ async function executeRemoteCommand(command) {
     const payload = command.payload || {};
 
     if (command.type === 'start-camera') {
+        logEvent('Tablet docente: richiesta avvio webcam ricevuta.');
         await startCamera();
-        return;
+        return 'Webcam avviata sul PC.';
     }
 
     if (command.type === 'read-question') {
         ensureAudioContext();
-        readCurrentQuestion();
-        return;
+        logEvent('Tablet docente: richiesta lettura domanda ricevuta.');
+        void readCurrentQuestion();
+        return 'Lettura domanda avviata sul PC.';
     }
 
     if (command.type === 'simulate-scroll') {
         ensureAudioContext();
         handleScrollCommand('Tablet docente');
-        return;
+        return 'Scroll risposta eseguito sul PC.';
     }
 
     if (command.type === 'simulate-select') {
         ensureAudioContext();
-        if (currentState === 'confirm') {
+        const isCancelMode = currentState === 'confirm';
+        if (isCancelMode) {
             await simulateEyeHold('cancel', 'Tablet docente');
         } else {
             await simulateEyeHold('select', 'Tablet docente');
         }
-        return;
+        return isCancelMode
+            ? 'Richiesta annullamento elaborata sul PC.'
+            : 'Richiesta selezione elaborata sul PC.';
     }
 
     if (command.type === 'simulate-confirm') {
         ensureAudioContext();
         if (currentState === 'confirm') {
             confirmSelection('Tablet docente');
+            return 'Conferma risposta eseguita sul PC.';
         } else {
             logEvent('Tablet docente: conferma ignorata, safe check non attivo.');
+            return 'Conferma ignorata: safe check non attivo sul PC.';
         }
-        return;
     }
 
     if (command.type === 'reset-flow') {
         resetCurrentFlow(true);
         logEvent('Tablet docente: reset completo della simulazione.');
         speakText('Simulazione resettata dal professore.', { interrupt: true, rate: 1.03 });
-        return;
+        return 'Quiz resettato sul PC.';
     }
 
     if (command.type === 'publish-now') {
         publishQuestionNow(payload.question || {}, 'Tablet docente');
-        return;
+        return 'Nuova domanda pubblicata subito sul PC.';
     }
 
     if (command.type === 'queue-next') {
         queueQuestionAsNext(payload.question || {}, 'Tablet docente');
+        return 'Nuova domanda messa in coda sul PC.';
     }
+
+    return 'Comando remoto ricevuto.';
 }
 
 async function pollRemoteCommands() {
@@ -912,28 +939,41 @@ async function pollRemoteCommands() {
     remoteCommandPollInFlight = true;
 
     try {
-        const after = remoteLastCommandId === null ? 0 : remoteLastCommandId;
+        const after = remoteLastCommandId === null ? remoteLastAckedCommandId : remoteLastCommandId;
         const response = await fetchJson(`/api/commands?after=${after}`);
         const commands = Array.isArray(response.commands) ? response.commands : [];
         const latestCommandId = Number(response.latestCommandId || 0);
+        const ackedCommandId = Number(response.ackedCommandId || 0);
 
         if (remoteLastCommandId === null) {
-            remoteLastCommandId = latestCommandId;
-            return;
+            remoteLastAckedCommandId = ackedCommandId;
+            remoteLastCommandId = ackedCommandId;
         }
 
         for (const command of commands) {
+            let commandStatus = 'ok';
+            let commandMessage = 'Comando eseguito sul PC.';
+
             try {
-                await executeRemoteCommand(command);
+                commandMessage = await executeRemoteCommand(command);
             } catch (error) {
+                commandStatus = 'error';
+                commandMessage = error.message || 'Errore durante l esecuzione sul PC.';
                 console.error('Errore comando remoto:', error);
-                logEvent(`Comando remoto fallito: ${error.message}`);
+                logEvent(`Comando remoto fallito: ${commandMessage}`);
             }
-            remoteLastCommandId = command.id;
+
+            try {
+                await acknowledgeRemoteCommand(command, commandStatus, commandMessage);
+            } catch (ackError) {
+                console.error('Errore ack comando remoto:', ackError);
+                setRemoteSyncStatus('Conferma comando non inviata al server', true);
+                break;
+            }
         }
 
         if (commands.length === 0) {
-            remoteLastCommandId = Math.max(remoteLastCommandId, latestCommandId);
+            remoteLastCommandId = Math.max(remoteLastCommandId || 0, ackedCommandId, latestCommandId);
         }
 
         setRemoteSyncStatus('Server docente collegato sulla rete locale');
@@ -1114,24 +1154,86 @@ function getItalianVoice() {
         .sort((left, right) => scoreItalianVoice(right) - scoreItalianVoice(left))[0] || null;
 }
 
-function speakText(text, options = {}) {
-    if (!('speechSynthesis' in window)) {
+function clearReadingHighlight() {
+    document.querySelectorAll('.is-being-read').forEach((element) => {
+        element.classList.remove('is-being-read');
+    });
+}
+
+function cancelActiveReadingSequence() {
+    activeReadingSequenceId += 1;
+    clearReadingHighlight();
+}
+
+function setReadingHighlight(target) {
+    clearReadingHighlight();
+    if (!target) {
         return;
     }
-    const { interrupt = false, rate = 0.98, pitch = 1.12, volume = 1 } = options;
+
+    if (target.container) {
+        target.container.classList.add('is-being-read');
+    }
+    if (target.text) {
+        target.text.classList.add('is-being-read');
+    }
+}
+
+function speakText(text, options = {}) {
+    if (!('speechSynthesis' in window)) {
+        return Promise.resolve();
+    }
+    const {
+        interrupt = false,
+        rate = 0.98,
+        pitch = 1.12,
+        volume = 1,
+        onStart = null,
+        onEnd = null,
+        resetReadingCue = interrupt
+    } = options;
+
     if (interrupt) {
         window.speechSynthesis.cancel();
+        if (resetReadingCue) {
+            cancelActiveReadingSequence();
+        }
     }
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'it-IT';
-    utterance.rate = rate;
-    utterance.pitch = pitch;
-    utterance.volume = volume;
-    const voice = getItalianVoice();
-    if (voice) {
-        utterance.voice = voice;
-    }
-    window.speechSynthesis.speak(utterance);
+
+    return new Promise((resolve) => {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'it-IT';
+        utterance.rate = rate;
+        utterance.pitch = pitch;
+        utterance.volume = volume;
+        let isSettled = false;
+
+        const finish = () => {
+            if (isSettled) {
+                return;
+            }
+            isSettled = true;
+            if (typeof onEnd === 'function') {
+                onEnd();
+            }
+            resolve();
+        };
+
+        utterance.onstart = () => {
+            if (typeof onStart === 'function') {
+                onStart();
+            }
+        };
+        utterance.onend = finish;
+        utterance.onerror = finish;
+
+        const voice = getItalianVoice();
+        if (voice) {
+            utterance.voice = voice;
+        }
+
+        window.speechSynthesis.speak(utterance);
+    });
 }
 
 function setCommandState(label) {
@@ -1164,6 +1266,7 @@ function logEvent(message) {
 }
 
 function updateQuestionHeader() {
+    clearReadingHighlight();
     if (simulationCompleted) {
         questionTitle.textContent = 'Test completato';
         questionCounter.textContent = `${questionSet.length} / ${questionSet.length}`;
@@ -1197,6 +1300,7 @@ function syncConfirmCard() {
 }
 
 function renderChoices() {
+    clearReadingHighlight();
     if (simulationCompleted) {
         choicesGrid.innerHTML = '';
         choiceButtons = [];
@@ -1210,7 +1314,6 @@ function renderChoices() {
             <div class="choice-content">
                 <div class="choice-letter">${OPTION_LETTERS[index]}</div>
                 <div class="choice-text">${option}</div>
-                <div class="choice-helper">Risposta ${OPTION_LETTERS[index]}</div>
             </div>
         </button>
     `).join('');
@@ -1380,24 +1483,58 @@ function advanceQuestion() {
     speakText(`Nuova domanda pronta. ${currentQuestion().title}.`, { interrupt: true, rate: 1.04 });
 }
 
-function readCurrentQuestion() {
+async function readCurrentQuestion() {
     if (simulationCompleted) {
-        speakText('Il test e completato. Premi reset per ricominciare.', { interrupt: true, rate: 1.02 });
+        await speakText('Il test e completato. Premi reset per ricominciare.', { interrupt: true, rate: 1.02 });
         return;
     }
 
     const question = currentQuestion();
-    const optionText = question.options
-        .map((option, index) => `${OPTION_LETTERS[index]} ${option}`)
-        .join('. ');
+    const sequenceId = activeReadingSequenceId + 1;
+    activeReadingSequenceId = sequenceId;
 
-    speakText(`${question.title}. ${question.prompt}. Opzioni: ${optionText}.`, {
-        interrupt: true,
-        rate: 1.01,
-        pitch: 1.04
-    });
+    const segments = [
+        {
+            text: `${question.title}. ${question.prompt}.`,
+            target: {
+                container: questionCard,
+                text: questionText
+            }
+        },
+        { text: 'Opzioni.' },
+        ...question.options.map((option, index) => ({
+            text: option,
+            target: {
+                container: choiceButtons[index],
+                text: choiceButtons[index]?.querySelector('.choice-text')
+            }
+        }))
+    ];
 
     logEvent('Lettura vocale della domanda attivata.');
+
+    for (let index = 0; index < segments.length; index += 1) {
+        if (sequenceId !== activeReadingSequenceId) {
+            return;
+        }
+
+        const segment = segments[index];
+        await speakText(segment.text, {
+            interrupt: index === 0,
+            resetReadingCue: false,
+            rate: 1.01,
+            pitch: 1.04,
+            onStart: () => {
+                if (sequenceId === activeReadingSequenceId) {
+                    setReadingHighlight(segment.target);
+                }
+            }
+        });
+    }
+
+    if (sequenceId === activeReadingSequenceId) {
+        clearReadingHighlight();
+    }
 }
 
 function beginPreselection(source) {

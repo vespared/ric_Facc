@@ -4,6 +4,7 @@ const SNAPSHOT_REFRESH_MS = 1200;
 const teacherConnectionStatus = document.getElementById('teacherConnectionStatus');
 const teacherPhaseBadge = document.getElementById('teacherPhaseBadge');
 const teacherQuestionBadge = document.getElementById('teacherQuestionBadge');
+const teacherCommandDeliveryStatus = document.getElementById('teacherCommandDeliveryStatus');
 const teacherLastUpdate = document.getElementById('teacherLastUpdate');
 const teacherActionStatus = document.getElementById('teacherActionStatus');
 
@@ -40,6 +41,30 @@ const teacherOptionDInput = document.getElementById('teacherOptionDInput');
 const teacherCorrectAnswerInput = document.getElementById('teacherCorrectAnswerInput');
 
 let snapshotTimer = null;
+let lastSentCommandId = 0;
+
+function getCommandLabel(type) {
+    switch (type) {
+        case 'start-camera':
+            return 'Avvia webcam';
+        case 'read-question':
+            return 'Leggi domanda';
+        case 'simulate-scroll':
+            return 'Scroll risposta';
+        case 'simulate-select':
+            return 'Seleziona / Annulla';
+        case 'simulate-confirm':
+            return 'Conferma risposta';
+        case 'reset-flow':
+            return 'Resetta quiz';
+        case 'publish-now':
+            return 'Pubblica subito';
+        case 'queue-next':
+            return 'Aggiungi come prossima';
+        default:
+            return type || 'Comando remoto';
+    }
+}
 
 function escapeHtml(value) {
     return String(value || '')
@@ -78,6 +103,24 @@ function setConnectionStatus(message, isError = false) {
 function setActionStatus(message, isError = false) {
     teacherActionStatus.textContent = message;
     teacherActionStatus.style.color = isError ? 'var(--red)' : 'var(--muted)';
+}
+
+function setCommandDeliveryStatus(message, tone = 'muted') {
+    if (!teacherCommandDeliveryStatus) {
+        return;
+    }
+
+    teacherCommandDeliveryStatus.textContent = message;
+    if (tone === 'error') {
+        teacherCommandDeliveryStatus.style.color = 'var(--red)';
+        return;
+    }
+    if (tone === 'success') {
+        teacherCommandDeliveryStatus.style.color = 'var(--green)';
+        return;
+    }
+
+    teacherCommandDeliveryStatus.style.color = 'var(--text)';
 }
 
 function setMetric(element, value) {
@@ -156,16 +199,49 @@ function renderEvents(snapshot) {
     `).join('');
 }
 
-function renderSnapshot(snapshot) {
+function renderCommandAck(commandAck) {
+    if (!commandAck || !commandAck.id) {
+        setCommandDeliveryStatus('Nessuna conferma ancora ricevuta');
+        return;
+    }
+
+    const when = commandAck.ackedAt
+        ? new Date(commandAck.ackedAt).toLocaleTimeString('it-IT')
+        : '--:--:--';
+    const label = getCommandLabel(commandAck.type);
+
+    if (commandAck.status === 'error') {
+        setCommandDeliveryStatus(`${label}: errore sul PC alle ${when}. ${commandAck.message || ''}`.trim(), 'error');
+        return;
+    }
+
+    setCommandDeliveryStatus(`${label}: eseguito sul PC alle ${when}`, 'success');
+}
+
+function renderSnapshot(snapshot, commandAck = null) {
     const updatedAt = snapshot.updatedAt ? new Date(snapshot.updatedAt) : null;
     const isFresh = updatedAt && (Date.now() - updatedAt.getTime()) < 5000;
 
-    setConnectionStatus(isFresh ? 'Collegato' : 'Segnale debole', !isFresh);
+    setConnectionStatus(isFresh ? 'Collegato in tempo reale' : 'Segnale debole o fermo', !isFresh);
     teacherPhaseBadge.textContent = snapshot.phaseLabel || '-';
     teacherQuestionBadge.textContent = snapshot.questionCounterLabel || '-';
     teacherLastUpdate.textContent = updatedAt
         ? `Ultimo aggiornamento: ${updatedAt.toLocaleTimeString('it-IT')}`
         : 'Nessun dato ricevuto';
+    renderCommandAck(commandAck);
+
+    if (lastSentCommandId > 0) {
+        if (commandAck && commandAck.id >= lastSentCommandId) {
+            setActionStatus(
+                commandAck.status === 'error'
+                    ? `Ultimo comando fallito sul PC: ${commandAck.message || 'errore remoto'}`
+                    : 'Ultimo comando eseguito dal PC',
+                commandAck.status === 'error'
+            );
+        } else {
+            setActionStatus('Comando inviato al server, in attesa del PC...');
+        }
+    }
 
     studentCameraStatus.textContent = snapshot.cameraState || '-';
     studentCommandStatus.textContent = snapshot.commandLabel || '-';
@@ -196,6 +272,7 @@ function renderDisconnectedState(message) {
     setConnectionStatus('Non collegato', true);
     teacherPhaseBadge.textContent = '-';
     teacherQuestionBadge.textContent = '-';
+    setCommandDeliveryStatus('Nessuna conferma dal PC', 'error');
     teacherLastUpdate.textContent = message;
     studentCameraStatus.textContent = '-';
     studentCommandStatus.textContent = '-';
@@ -221,7 +298,7 @@ async function refreshSnapshot() {
             return;
         }
 
-        renderSnapshot(response.snapshot);
+        renderSnapshot(response.snapshot, response.commandAck || null);
     } catch (error) {
         renderDisconnectedState('Server o quiz non raggiungibile.');
     }
@@ -229,12 +306,14 @@ async function refreshSnapshot() {
 
 async function sendCommand(type, payload = {}) {
     try {
-        setActionStatus('Invio comando al PC...');
-        await fetchJson('/api/command', {
+        setActionStatus('Invio comando al server...');
+        const response = await fetchJson('/api/command', {
             method: 'POST',
             body: JSON.stringify({ type, payload })
         });
-        setActionStatus('Comando inviato al PC');
+        lastSentCommandId = response.command && response.command.id ? response.command.id : lastSentCommandId;
+        setActionStatus('Comando registrato sul server, in attesa del PC...');
+        setCommandDeliveryStatus(`${getCommandLabel(type)}: in attesa di conferma dal PC`);
         return true;
     } catch (error) {
         setActionStatus(`Errore invio: ${error.message}`, true);

@@ -17,10 +17,23 @@
 
 <body class="teacher-body">
     <div class="teacher-shell">
-        <section class="developer-bridge-hidden" aria-hidden="true" inert>
-            <strong id="teacherConnectionStatus">In attesa</strong>
-            <strong id="teacherPhaseBadge">-</strong>
-            <strong id="teacherQuestionBadge">-</strong>
+        <section class="teacher-live-bar">
+            <article class="teacher-live-pill">
+                <span>Studente</span>
+                <strong id="teacherConnectionStatus">In attesa</strong>
+            </article>
+            <article class="teacher-live-pill">
+                <span>Fase</span>
+                <strong id="teacherPhaseBadge">-</strong>
+            </article>
+            <article class="teacher-live-pill">
+                <span>Domanda</span>
+                <strong id="teacherQuestionBadge">-</strong>
+            </article>
+            <article class="teacher-live-pill teacher-live-pill--wide">
+                <span>Ultimo comando</span>
+                <strong id="teacherCommandDeliveryStatus">Nessuna conferma ancora ricevuta</strong>
+            </article>
         </section>
 
         <main class="teacher-grid">
