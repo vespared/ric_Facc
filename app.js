@@ -1616,20 +1616,25 @@ function scoreItalianVoice(voice) {
     if (lang === 'it-it') {
         score += 20;
     }
+    // Voci neurali di alta qualita (Edge "Online (Natural)"): priorita massima.
     if (name.includes('natural') || name.includes('online')) {
-        score += 40;
+        score += 80;
     }
-    if (name.includes('female') || name.includes('woman')) {
-        score += 18;
+    // Voci femminili italiane note di Edge/Windows.
+    if (name.includes('elsa') || name.includes('isabella') || name.includes('alice') || name.includes('federica') || name.includes('lucia') || name.includes('giulia')) {
+        score += 45;
     }
-    if (name.includes('elsa') || name.includes('alice') || name.includes('federica') || name.includes('lucia') || name.includes('giulia') || name.includes('isabella')) {
-        score += 35;
+    if (name.includes('female') || name.includes('woman') || name.includes('donna')) {
+        score += 30;
     }
-    if (name.includes('google') || name.includes('microsoft')) {
-        score += 10;
+    // Penalizza le voci maschili note (es. Diego) per restare su una voce femminile.
+    if (name.includes('diego') || name.includes('cosimo') || name.includes('male') || name.includes('uomo')) {
+        score -= 60;
     }
-    if (voice.localService) {
-        score += 6;
+    if (name.includes('microsoft')) {
+        score += 12;
+    } else if (name.includes('google')) {
+        score += 8;
     }
 
     return score;
@@ -1677,7 +1682,7 @@ function speakText(text, options = {}) {
     const {
         interrupt = false,
         rate = 0.98,
-        pitch = 1.12,
+        pitch = 1.0,
         volume = 1,
         onStart = null,
         onEnd = null,
