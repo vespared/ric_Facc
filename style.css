@@ -1286,3 +1286,231 @@ select {
     border-radius: 24px;
     box-shadow: var(--shadow);
 }
+
+/* --- Splash di licenza (mostrato 10s all'avvio studente) --- */
+.license-splash {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 4px 24px 24px;
+    opacity: 1;
+    transition: opacity 0.6s ease;
+    overflow-y: auto;
+}
+
+.license-splash--closing {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.license-splash__backdrop {
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at top left, rgba(45, 226, 230, 0.16), transparent 32%),
+        radial-gradient(circle at 85% 18%, rgba(255, 95, 162, 0.14), transparent 26%),
+        radial-gradient(circle at 50% 110%, rgba(255, 209, 102, 0.16), transparent 30%),
+        linear-gradient(160deg, #060b14 0%, #0c1830 52%, #0a1222 100%);
+    backdrop-filter: blur(6px);
+}
+
+.license-splash__card {
+    position: relative;
+    width: min(1040px, 100%);
+    text-align: center;
+    padding: clamp(56px, 7vw, 96px) clamp(48px, 7vw, 88px);
+    background: var(--panel-strong);
+    border: 1px solid var(--line);
+    border-radius: 36px;
+    box-shadow: var(--shadow);
+    transform-origin: top center;
+    transform: scale(0.85);
+    animation: license-rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes license-rise {
+    from {
+        opacity: 0;
+        transform: translateY(18px) scale(0.833);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(0.85);
+    }
+}
+
+.license-splash__mark {
+    width: 144px;
+    height: 144px;
+    margin: 0 auto 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 76px;
+    font-weight: 700;
+    color: #061018;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--cyan), #6ff5cf);
+    box-shadow: 0 18px 44px rgba(45, 226, 230, 0.35);
+}
+
+.license-splash__year {
+    margin-bottom: 12px;
+    font-size: 1.1rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--cyan);
+}
+
+.license-splash__title {
+    margin-bottom: 30px;
+    font-size: clamp(2.4rem, 4.6vw, 3.2rem);
+    font-weight: 700;
+    color: var(--text);
+}
+
+.license-splash__body {
+    font-size: clamp(1.3rem, 2vw, 1.6rem);
+    line-height: 1.7;
+    color: var(--muted);
+}
+
+.license-splash__body strong {
+    color: var(--text);
+    font-weight: 700;
+}
+
+.license-splash__progress {
+    margin-top: 28px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(136, 176, 255, 0.16);
+    overflow: hidden;
+}
+
+.license-splash__progress-bar {
+    display: block;
+    height: 100%;
+    width: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--cyan), var(--pink));
+    transform-origin: left center;
+    transform: scaleX(0);
+    animation: license-progress 10s linear forwards;
+}
+
+@keyframes license-progress {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .license-splash__card,
+    .license-splash__progress-bar {
+        animation: none;
+    }
+    .license-splash__progress-bar {
+        transform: scaleX(1);
+    }
+}
+
+/* --- Gate d'attesa: l'esame parte solo al comando del professore --- */
+.exam-gate {
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    opacity: 1;
+    transition: opacity 0.5s ease;
+}
+
+.exam-gate--hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.exam-gate__backdrop {
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at top left, rgba(45, 226, 230, 0.16), transparent 32%),
+        radial-gradient(circle at 85% 18%, rgba(255, 95, 162, 0.14), transparent 26%),
+        radial-gradient(circle at 50% 110%, rgba(255, 209, 102, 0.16), transparent 30%),
+        linear-gradient(160deg, #060b14 0%, #0c1830 52%, #0a1222 100%);
+    backdrop-filter: blur(6px);
+}
+
+.exam-gate__card {
+    position: relative;
+    width: min(880px, 100%);
+    text-align: center;
+    padding: clamp(48px, 6vw, 80px) clamp(40px, 6vw, 72px);
+    background: var(--panel-strong);
+    border: 1px solid var(--line);
+    border-radius: 36px;
+    box-shadow: var(--shadow);
+}
+
+.exam-gate__pulse {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-bottom: 28px;
+}
+
+.exam-gate__pulse span {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--cyan);
+    animation: exam-gate-bounce 1.4s ease-in-out infinite;
+}
+
+.exam-gate__pulse span:nth-child(2) {
+    background: var(--pink);
+    animation-delay: 0.2s;
+}
+
+.exam-gate__pulse span:nth-child(3) {
+    background: var(--yellow);
+    animation-delay: 0.4s;
+}
+
+@keyframes exam-gate-bounce {
+    0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+    40% { transform: scale(1); opacity: 1; }
+}
+
+.exam-gate__eyebrow {
+    margin-bottom: 12px;
+    font-size: 1.1rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--cyan);
+}
+
+.exam-gate__title {
+    margin-bottom: 24px;
+    font-size: clamp(2rem, 4.2vw, 2.9rem);
+    font-weight: 700;
+    color: var(--text);
+}
+
+.exam-gate__body {
+    font-size: clamp(1.2rem, 1.9vw, 1.5rem);
+    line-height: 1.7;
+    color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .exam-gate__pulse span {
+        animation: none;
+    }
+}

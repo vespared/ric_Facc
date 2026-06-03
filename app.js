@@ -108,6 +108,7 @@ let confirmProgress = 0;
 let confirmProgressMode = 'confirm';
 let confirmCancelEnabled = false;
 let simulationCompleted = false;
+let examStarted = false;
 let nextQuestionTimer = null;
 let manualLock = false;
 let demoRunning = false;
@@ -1121,6 +1122,12 @@ function queueQuestionBatchAsNext(rawQuestions, source = 'Tablet docente') {
 async function executeRemoteCommand(command) {
     const payload = command.payload || {};
 
+    if (command.type === 'start-exam') {
+        ensureAudioContext();
+        startExam();
+        return 'Esame avviato sul PC.';
+    }
+
     if (command.type === 'start-camera') {
         logEvent('Tablet docente: richiesta avvio webcam ricevuta.');
         await startCamera();
@@ -1312,6 +1319,32 @@ async function executeRemoteCommand(command) {
     }
 
     return 'Comando remoto ricevuto.';
+}
+
+function hideExamGate() {
+    const gate = document.getElementById('examGate');
+    if (!gate) {
+        return;
+    }
+    gate.classList.add('exam-gate--hidden');
+    window.setTimeout(() => {
+        if (gate.parentNode) {
+            gate.parentNode.removeChild(gate);
+        }
+    }, 600);
+}
+
+function startExam() {
+    if (examStarted) {
+        logEvent("Tablet docente: comando inizio esame ignorato (esame gia avviato).");
+        return;
+    }
+    examStarted = true;
+    hideExamGate();
+    resetCurrentFlow(true);
+    setCommandState('Esame avviato');
+    logEvent("Tablet docente: l'esame ha inizio.");
+    speakText("L'esame ha inizio. Ecco la prima domanda.", { interrupt: true, rate: 1.02, pitch: 1.04 });
 }
 
 function showExamThankYou() {
@@ -2820,6 +2853,14 @@ logEvent('Profilo calibrato caricato: EAR 0.13, MAR 0.17, occhiali attivi.');
 setCommandState('In attesa');
 startRemoteSync();
 void loadDefaultSubjectQuestions();
+
+// Senza server (apertura come file locale) non c'e' un docente che invii
+// l'inizio esame: in tal caso si avvia direttamente, evitando il blocco sul gate.
+if (!REMOTE_SYNC_ENABLED) {
+    startExam();
+} else {
+    setCommandState("In attesa dell'inizio dell'esame");
+}
 
 async function loadDefaultSubjectQuestions() {
     try {

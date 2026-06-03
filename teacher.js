@@ -23,6 +23,7 @@ const teacherRightEar = document.getElementById('teacherRightEar');
 const teacherAverageEar = document.getElementById('teacherAverageEar');
 const teacherMar = document.getElementById('teacherMar');
 
+const teacherStartExamBtn = document.getElementById('teacherStartExamBtn');
 const teacherStartCameraBtn = document.getElementById('teacherStartCameraBtn');
 const teacherReadQuestionBtn = document.getElementById('teacherReadQuestionBtn');
 const teacherScrollBtn = document.getElementById('teacherScrollBtn');
@@ -77,6 +78,8 @@ let lastSentCommandId = 0;
 
 function getCommandLabel(type) {
     switch (type) {
+        case 'start-exam':
+            return 'Inizia esame';
         case 'start-camera':
             return 'Avvia webcam';
         case 'read-question':
@@ -682,6 +685,12 @@ async function sendQuestionCommand(commandType) {
     } catch (error) {
         setActionStatus(error.message, true);
     }
+}
+
+if (teacherStartExamBtn) {
+    teacherStartExamBtn.addEventListener('click', () => {
+        void sendCommand('start-exam');
+    });
 }
 
 teacherStartCameraBtn.addEventListener('click', () => {
