@@ -6,7 +6,8 @@
     scrollActivationMs: 300,
     scrollCooldownMs: 1000,
     selectHoldMs: 1000,
-    answerAdvanceDelayMs: 2200,
+    answerAdvanceDelayMs: 5200,
+    answerFeedbackVisibleMs: 4600,
     eventLogSize: 8
 };
 
@@ -18,24 +19,19 @@ let EAR_THRESHOLD = CONFIG.earThreshold;
 let MAR_THRESHOLD = CONFIG.marThreshold;
 let isGlassesMode = CONFIG.glassesMode;
 
+const DEFAULT_SUBJECT = 'Italiano';
+
 const DEFAULT_QUESTION_SET = [
     {
-        title: 'Domanda 1',
-        prompt: 'Quale pianeta e conosciuto come Pianeta Rosso?',
-        options: ['Marte', 'Giove', 'Venere', 'Nettuno'],
-        correctIndex: 0
-    },
-    {
-        title: 'Domanda 2',
-        prompt: 'Quale materia prima e usata per fare il vetro tradizionale?',
-        options: ['Sabbia', 'Legno', 'Argilla', 'Rame'],
-        correctIndex: 0
-    },
-    {
-        title: 'Domanda 3',
-        prompt: 'In un quiz Kahoot, cosa succede dopo la conferma finale della risposta?',
-        options: ['La risposta viene registrata', 'Il quiz si chiude subito', 'La webcam si spegne', 'Il timer torna a zero'],
-        correctIndex: 0
+        title: 'Manzoni e la lingua de I Promessi Sposi',
+        prompt: 'Perché Manzoni scelse una lingua semplice e quale modello usò?',
+        options: [
+            'Voleva usare il latino per rivolgersi solo ai nobili e ai dotti.',
+            "Voleva il fiorentino parlato dai colti per unificare l'Italia.",
+            'Voleva scrivere in dialetto milanese perché era più spontaneo.',
+            'Voleva creare una lingua complicata per dimostrare la sua bravura.'
+        ],
+        correctIndex: 1
     }
 ];
 
@@ -101,6 +97,7 @@ let latestMar = 0;
 
 let isRunning = false;
 let camera = null;
+let cameraWasRunningBeforePresentation = false;
 let currentQuestionIndex = 0;
 let currentState = 'idle';
 let focusedIndex = -1;
@@ -156,6 +153,12 @@ const confirmCard = document.getElementById('confirmCard');
 const confirmTitle = document.getElementById('confirmTitle');
 const confirmText = document.getElementById('confirmText');
 const confirmProgressBar = document.getElementById('confirmProgressBar');
+const quizCardStudent = document.querySelector('.quiz-card--student');
+const answerFeedback = document.getElementById('answerFeedback');
+const answerFeedbackBadge = document.getElementById('answerFeedbackBadge');
+const answerFeedbackTitle = document.getElementById('answerFeedbackTitle');
+const answerFeedbackSubtitle = document.getElementById('answerFeedbackSubtitle');
+const answerFeedbackParticles = document.getElementById('answerFeedbackParticles');
 const avgEarValue = document.getElementById('avgEarValue');
 const liveMarValue = document.getElementById('liveMarValue');
 const commandState = document.getElementById('commandState');
@@ -177,6 +180,10 @@ const teacherUrlHint = document.getElementById('teacherUrlHint');
 
 const LEFT_EYE = [362, 385, 387, 263, 373, 380];
 const RIGHT_EYE = [33, 160, 158, 133, 153, 144];
+const MOUTH_LANDMARKS = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185, 78, 308, 13, 14];
+const FRAMING_MARGIN = 0.05;
+const FRAMING_FACE_MIN = 0.18;
+const FRAMING_FACE_MAX = 0.95;
 const REMOTE_SYNC_ENABLED = window.location.protocol === 'http:' || window.location.protocol === 'https:';
 const DEBUG_CHANNEL_NAME = 'ric-facc-student-debug';
 const DEBUG_STORAGE_KEY = 'ricFaccDebugSnapshot';
@@ -196,11 +203,152 @@ let remoteLastFrameAt = 0;
 let lastFaceDetected = false;
 let activeReadingSequenceId = 0;
 let remoteLastAckedCommandId = 0;
+let latestFraming = createEmptyFraming(false);
 
 const remoteEventHistory = [];
 
 function currentQuestion() {
     return questionSet[currentQuestionIndex];
+}
+
+function createEmptyFraming(cameraRunning) {
+    return {
+        cameraRunning: Boolean(cameraRunning),
+        faceDetected: false,
+        margin: FRAMING_MARGIN,
+        faceBox: null,
+        faceWidth: 0,
+        faceHeight: 0,
+        features: {
+            leftEye: { present: false, withinFrame: false, center: null, bbox: null },
+            rightEye: { present: false, withinFrame: false, center: null, bbox: null },
+            mouth: { present: false, withinFrame: false, center: null, bbox: null }
+        },
+        overall: cameraRunning ? 'no-face' : 'inactive',
+        message: cameraRunning
+            ? 'Volto non rilevato dalla webcam.'
+            : 'Webcam non avviata sul PC.'
+    };
+}
+
+function landmarkBoundingBox(landmarks, indices) {
+    if (!landmarks || !indices || indices.length === 0) {
+        return null;
+    }
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let count = 0;
+
+    for (const index of indices) {
+        const point = landmarks[index];
+        if (!point) {
+            continue;
+        }
+        const x = Number(point.x);
+        const y = Number(point.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+            continue;
+        }
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+        count += 1;
+    }
+
+    if (count === 0) {
+        return null;
+    }
+    return {
+        minX: Number(minX.toFixed(4)),
+        minY: Number(minY.toFixed(4)),
+        maxX: Number(maxX.toFixed(4)),
+        maxY: Number(maxY.toFixed(4))
+    };
+}
+
+function bboxCenter(box) {
+    if (!box) return null;
+    return {
+        x: Number(((box.minX + box.maxX) / 2).toFixed(4)),
+        y: Number(((box.minY + box.maxY) / 2).toFixed(4))
+    };
+}
+
+function bboxWithinFrame(box, margin) {
+    if (!box) return false;
+    return box.minX >= margin
+        && box.minY >= margin
+        && box.maxX <= 1 - margin
+        && box.maxY <= 1 - margin;
+}
+
+function buildFeatureFraming(landmarks, indices, margin) {
+    const bbox = landmarkBoundingBox(landmarks, indices);
+    if (!bbox) {
+        return { present: false, withinFrame: false, center: null, bbox: null };
+    }
+    return {
+        present: true,
+        withinFrame: bboxWithinFrame(bbox, margin),
+        center: bboxCenter(bbox),
+        bbox
+    };
+}
+
+function computeFramingFromLandmarks(landmarks, cameraRunning) {
+    if (!landmarks || landmarks.length === 0) {
+        return createEmptyFraming(cameraRunning);
+    }
+
+    const margin = FRAMING_MARGIN;
+    const allIndices = landmarks.map((_, index) => index);
+    const faceBox = landmarkBoundingBox(landmarks, allIndices);
+    const faceWidth = faceBox ? Number((faceBox.maxX - faceBox.minX).toFixed(4)) : 0;
+    const faceHeight = faceBox ? Number((faceBox.maxY - faceBox.minY).toFixed(4)) : 0;
+
+    const features = {
+        leftEye: buildFeatureFraming(landmarks, LEFT_EYE, margin),
+        rightEye: buildFeatureFraming(landmarks, RIGHT_EYE, margin),
+        mouth: buildFeatureFraming(landmarks, MOUTH_LANDMARKS, margin)
+    };
+
+    const featureValues = Object.values(features);
+    const missing = featureValues.filter((feature) => !feature.present).length;
+    const outOfFrame = featureValues.filter((feature) => feature.present && !feature.withinFrame).length;
+    const tooSmall = faceWidth > 0 && faceWidth < FRAMING_FACE_MIN;
+    const tooClose = faceWidth > FRAMING_FACE_MAX;
+
+    let overall = 'ok';
+    let message = 'Inquadratura corretta: occhi e bocca ben visibili.';
+
+    if (missing > 0) {
+        overall = 'error';
+        message = 'Alcuni tratti del viso non sono rilevati: chiedi al ragazzo di riposizionarsi davanti alla webcam.';
+    } else if (outOfFrame > 0) {
+        overall = 'error';
+        message = 'Occhi o bocca troppo vicini al bordo del frame: centra meglio il viso nella webcam.';
+    } else if (tooSmall) {
+        overall = 'warning';
+        message = 'Il viso e troppo lontano dalla webcam: avvicinati di qualche centimetro.';
+    } else if (tooClose) {
+        overall = 'warning';
+        message = 'Il viso e troppo vicino alla webcam: allontanati di qualche centimetro.';
+    }
+
+    return {
+        cameraRunning: Boolean(cameraRunning),
+        faceDetected: true,
+        margin,
+        faceBox,
+        faceWidth,
+        faceHeight,
+        features,
+        overall,
+        message
+    };
 }
 
 function normalizeHeader(value) {
@@ -419,6 +567,7 @@ function buildStudentSnapshot(includeFrames = false) {
             mar: MAR_THRESHOLD,
             glassesMode: isGlassesMode
         },
+        framing: latestFraming,
         currentQuestion: question ? {
             title: question.title,
             prompt: question.prompt,
@@ -912,7 +1061,11 @@ function publishQuestionBatchNow(rawQuestions, source = 'Tablet docente') {
         throw new Error('Nessuna domanda trovata nel file importato.');
     }
 
-    const insertIndex = Math.min(Math.max(currentQuestionIndex, 0), questionSet.length);
+    // A materia conclusa, accoda il nuovo blocco in fondo (senza riproporre
+    // l'ultima domanda della materia precedente); altrimenti pubblica in posizione corrente.
+    const insertIndex = simulationCompleted
+        ? questionSet.length
+        : Math.min(Math.max(currentQuestionIndex, 0), questionSet.length);
     const insertedQuestions = insertQuestionsIntoFlow(rawQuestions, insertIndex);
     const firstQuestion = insertedQuestions[0];
 
@@ -1038,7 +1191,148 @@ async function executeRemoteCommand(command) {
         return 'File di domande aggiunto in coda sul PC.';
     }
 
+    if (command.type === 'switch-to-presentation') {
+        const url = String(payload.url || '').trim();
+        if (!url || (!/^https?:\/\//i.test(url) && !url.startsWith('/'))) {
+            return 'Percorso o URL video non valido.';
+        }
+        cameraWasRunningBeforePresentation = isRunning;
+        if (isRunning) {
+            await stopCamera();
+        }
+        let overlay = document.getElementById('presentationOverlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'presentationOverlay';
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#000;display:flex;align-items:center;justify-content:center';
+            const video = document.createElement('video');
+            video.id = 'presentationVideo';
+            video.style.cssText = 'width:100%;height:100%;object-fit:contain';
+            video.preload = 'auto';
+            overlay.appendChild(video);
+            document.body.appendChild(overlay);
+        }
+        const video = document.getElementById('presentationVideo');
+        const requestedAbsUrl = (() => { try { return new URL(url, window.location.href).href; } catch (_) { return url; } })();
+        if ((video.currentSrc || '') !== requestedAbsUrl) {
+            video.src = url;
+            video.currentTime = 0;
+        }
+        overlay.style.display = 'flex';
+        video.play().catch(() => {});
+        logEvent('Video presentazione aperto dal tablet del docente.');
+        return 'Video aperto sul PC.';
+    }
+
+    if (command.type === 'close-presentation') {
+        const overlay = document.getElementById('presentationOverlay');
+        if (overlay) {
+            const video = document.getElementById('presentationVideo');
+            if (video) {
+                video.pause();
+            }
+            overlay.style.display = 'none';
+        }
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(() => {});
+        }
+        logEvent('Video presentazione chiuso dal tablet del docente.');
+        if (cameraWasRunningBeforePresentation) {
+            cameraWasRunningBeforePresentation = false;
+            await startCamera();
+        }
+        return 'Video chiuso sul PC.';
+    }
+
+    if (command.type === 'video-play') {
+        const video = document.getElementById('presentationVideo');
+        if (!video) return 'Nessun video aperto sul PC.';
+        video.play().catch(() => {});
+        logEvent('Tablet docente: play video.');
+        return 'Video in riproduzione sul PC.';
+    }
+
+    if (command.type === 'video-pause') {
+        const video = document.getElementById('presentationVideo');
+        if (!video) return 'Nessun video aperto sul PC.';
+        video.pause();
+        logEvent('Tablet docente: pausa video.');
+        return 'Video in pausa sul PC.';
+    }
+
+    if (command.type === 'video-restart') {
+        const video = document.getElementById('presentationVideo');
+        if (!video) return 'Nessun video aperto sul PC.';
+        video.currentTime = 0;
+        video.play().catch(() => {});
+        logEvent('Tablet docente: ricomincia video.');
+        return 'Video riavviato dall\'inizio sul PC.';
+    }
+
+    if (command.type === 'video-skip-forward') {
+        const video = document.getElementById('presentationVideo');
+        if (!video) return 'Nessun video aperto sul PC.';
+        video.currentTime = Math.min(video.duration || video.currentTime, video.currentTime + 10);
+        return 'Video avanzato di 10s sul PC.';
+    }
+
+    if (command.type === 'video-skip-backward') {
+        const video = document.getElementById('presentationVideo');
+        if (!video) return 'Nessun video aperto sul PC.';
+        video.currentTime = Math.max(0, video.currentTime - 10);
+        return 'Video indietro di 10s sul PC.';
+    }
+
+    if (command.type === 'next-question') {
+        ensureAudioContext();
+        if (simulationCompleted) {
+            return 'Materia gia completata: nessuna domanda successiva.';
+        }
+        const wasLast = currentQuestionIndex >= questionSet.length - 1;
+        advanceQuestion();
+        return wasLast
+            ? 'Materia completata sul PC.'
+            : 'Passaggio alla domanda successiva sul PC.';
+    }
+
+    if (command.type === 'repeat-question') {
+        ensureAudioContext();
+        if (simulationCompleted) {
+            return 'Materia completata: nessuna domanda da ripetere.';
+        }
+        resetCurrentFlow(false);
+        logEvent('Tablet docente: ripetizione della domanda corrente.');
+        void readCurrentQuestion();
+        return 'Domanda ripetuta sul PC.';
+    }
+
+    if (command.type === 'finish-exam') {
+        showExamThankYou();
+        return 'Esame concluso: ringraziamenti mostrati sul PC.';
+    }
+
     return 'Comando remoto ricevuto.';
+}
+
+function showExamThankYou() {
+    simulationCompleted = true;
+    let overlay = document.getElementById('examThankYouOverlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'examThankYouOverlay';
+        overlay.className = 'exam-thankyou-overlay';
+        overlay.innerHTML = `
+            <img class="exam-thankyou-image" src="finale.png" alt="Esame concluso. Grazie alla commissione e complimenti a Giuseppe per il grande impegno.">`;
+        document.body.appendChild(overlay);
+    }
+    overlay.style.display = 'flex';
+    setState('done');
+    setCommandState('Esame concluso');
+    logEvent('Esame concluso: ringraziamenti mostrati sul PC.');
+    speakText(
+        "L'esame e concluso. Grazie alla commissione per la presenza. Un grande complimento a Giuseppe per il grande impegno dimostrato durante tutto l'esame.",
+        { interrupt: true, rate: 1.0, pitch: 1.05 }
+    );
 }
 
 async function pollRemoteCommands() {
@@ -1205,6 +1499,63 @@ function playTone(frequency, durationMs = 120, type = 'sine', gainValue = 0.08) 
     oscillator.stop(now + durationMs / 1000 + 0.02);
 }
 
+function playRichTone(options = {}) {
+    const ctx = ensureAudioContext();
+    if (!ctx) {
+        return;
+    }
+    const {
+        frequency = 440,
+        durationMs = 200,
+        type = 'sine',
+        gain = 0.08,
+        attackMs = 14,
+        detune = 0,
+        slideToFrequency = null,
+        slideMs = null,
+        startDelayMs = 0,
+        filter = null
+    } = options;
+
+    const startTime = ctx.currentTime + Math.max(0, startDelayMs) / 1000;
+    const endTime = startTime + durationMs / 1000;
+    const attackEnd = startTime + Math.min(attackMs, durationMs * 0.6) / 1000;
+
+    const oscillator = ctx.createOscillator();
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, startTime);
+    if (detune) {
+        oscillator.detune.setValueAtTime(detune, startTime);
+    }
+    if (slideToFrequency != null) {
+        const slideEnd = startTime + (slideMs ?? durationMs) / 1000;
+        oscillator.frequency.exponentialRampToValueAtTime(Math.max(20, slideToFrequency), slideEnd);
+    }
+
+    const gainNode = ctx.createGain();
+    gainNode.gain.setValueAtTime(0.0001, startTime);
+    gainNode.gain.exponentialRampToValueAtTime(Math.max(0.0002, gain), attackEnd);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, endTime);
+
+    oscillator.connect(gainNode);
+
+    if (filter) {
+        const filterNode = ctx.createBiquadFilter();
+        filterNode.type = filter.type || 'lowpass';
+        filterNode.frequency.setValueAtTime(filter.frequency || 1200, startTime);
+        if (filter.Q != null) {
+            filterNode.Q.setValueAtTime(filter.Q, startTime);
+        }
+        gainNode.connect(filterNode);
+        filterNode.connect(ctx.destination);
+    } else {
+        gainNode.connect(ctx.destination);
+    }
+
+    oscillator.start(startTime);
+    oscillator.stop(endTime + 0.05);
+}
+
 function playChime(type) {
     if (type === 'scroll') {
         playTone(820, 90, 'square', 0.11);
@@ -1217,6 +1568,36 @@ function playChime(type) {
         playTone(660, 160, 'triangle', 0.11);
         window.setTimeout(() => playTone(880, 180, 'triangle', 0.12), 120);
         window.setTimeout(() => playTone(1100, 220, 'sine', 0.09), 230);
+    } else if (type === 'success') {
+        playRichTone({ frequency: 523.25, durationMs: 150, type: 'triangle', gain: 0.12, attackMs: 8, startDelayMs: 0 });
+        playRichTone({ frequency: 659.25, durationMs: 150, type: 'triangle', gain: 0.13, attackMs: 8, startDelayMs: 95 });
+        playRichTone({ frequency: 783.99, durationMs: 170, type: 'triangle', gain: 0.14, attackMs: 8, startDelayMs: 190 });
+        playRichTone({ frequency: 1046.5, durationMs: 520, type: 'sine', gain: 0.17, attackMs: 10, startDelayMs: 300 });
+        playRichTone({ frequency: 1568.0, durationMs: 460, type: 'sine', gain: 0.06, attackMs: 14, startDelayMs: 300, detune: 5 });
+        playRichTone({ frequency: 2093.0, durationMs: 360, type: 'sine', gain: 0.04, attackMs: 18, startDelayMs: 360 });
+        playRichTone({ frequency: 261.63, durationMs: 520, type: 'sine', gain: 0.07, attackMs: 16, startDelayMs: 300 });
+        window.setTimeout(() => {
+            playRichTone({ frequency: 2637.0, durationMs: 110, type: 'sine', gain: 0.05, attackMs: 6 });
+            playRichTone({ frequency: 3136.0, durationMs: 90, type: 'sine', gain: 0.035, attackMs: 6, startDelayMs: 70 });
+        }, 540);
+    } else if (type === 'miss') {
+        playRichTone({
+            frequency: 440, durationMs: 280, type: 'triangle', gain: 0.11, attackMs: 14,
+            filter: { type: 'lowpass', frequency: 1500 }
+        });
+        playRichTone({
+            frequency: 370, durationMs: 320, type: 'triangle', gain: 0.11, attackMs: 14, startDelayMs: 220,
+            filter: { type: 'lowpass', frequency: 1200 }
+        });
+        playRichTone({
+            frequency: 330, durationMs: 520, type: 'sine', gain: 0.1, attackMs: 18, startDelayMs: 480,
+            slideToFrequency: 247, slideMs: 460,
+            filter: { type: 'lowpass', frequency: 1000 }
+        });
+        playRichTone({
+            frequency: 165, durationMs: 620, type: 'sine', gain: 0.05, attackMs: 24, startDelayMs: 220,
+            filter: { type: 'lowpass', frequency: 700 }
+        });
     } else if (type === 'cancel') {
         playTone(340, 140, 'sawtooth', 0.1);
         window.setTimeout(() => playTone(250, 180, 'sawtooth', 0.08), 120);
@@ -1378,9 +1759,9 @@ function logEvent(message) {
 function updateQuestionHeader() {
     clearReadingHighlight();
     if (simulationCompleted) {
-        questionTitle.textContent = 'Test completato';
+        questionTitle.textContent = 'Materia completata';
         questionCounter.textContent = `${questionSet.length} / ${questionSet.length}`;
-        questionText.textContent = 'Flusso validato: attivazione, scrolling, preselezione e conferma hanno completato il test. Premi "Resetta domanda" per ricominciare.';
+        questionText.textContent = 'Materia completata. In pausa, in attesa che il professore scelga la prossima materia o concluda l\'esame.';
         requestStudentSnapshotSync();
         return;
     }
@@ -1541,6 +1922,8 @@ function resetCurrentFlow(goToStart = false) {
         nextQuestionTimer = null;
     }
 
+    hideAnswerFeedback();
+
     if (goToStart) {
         currentQuestionIndex = 0;
         simulationCompleted = false;
@@ -1565,12 +1948,14 @@ function completeSimulation() {
     setState('done');
     updateQuestionHeader();
     renderChoices();
-    setCommandState('Test completato');
-    logEvent('Simulazione completata con successo.');
-    speakText('Test completato. Il flusso di risposta e stato verificato.', { interrupt: true, rate: 1.02 });
+    setCommandState('Materia completata - in pausa');
+    logEvent('Materia completata. In pausa, in attesa del professore.');
+    speakText('Materia completata. Restiamo in pausa, in attesa del professore.', { interrupt: true, rate: 1.02 });
 }
 
 function advanceQuestion() {
+    hideAnswerFeedback();
+
     if (currentQuestionIndex >= questionSet.length - 1) {
         completeSimulation();
         return;
@@ -1683,7 +2068,7 @@ function completePreselection(source) {
     setCommandState('Safe check attivo');
     playChime('select');
     logEvent(`${source}: risposta ${OPTION_LETTERS[selectedIndex]} catturata, safe check aperto.`);
-    speakText(`Hai scelto ${OPTION_LETTERS[selectedIndex]}. ${currentQuestion().options[selectedIndex]}. Apri la bocca per confermare.`, {
+    speakText(`Hai scelto ${currentQuestion().options[selectedIndex]}. Apri la bocca per confermare.`, {
         interrupt: true,
         rate: 1.04
     });
@@ -1702,6 +2087,167 @@ function cancelSelection(source) {
     speakText('Scelta annullata. Continua a scorrere le risposte.', { interrupt: true, rate: 1.04 });
 }
 
+const CORRECT_FEEDBACK_TITLES = [
+    'Bravissimo!',
+    'Fantastico!',
+    'Eccellente!',
+    'Ottimo lavoro!',
+    'Perfetto!',
+    'Sei un campione!',
+    'Risposta giusta!',
+    'Grandioso!',
+    'Splendido!',
+    'Complimenti!',
+    'Magnifico!',
+    'Strepitoso!'
+];
+const CORRECT_FEEDBACK_SUBTITLES = [
+    'Hai centrato in pieno la risposta giusta, continua cosi.',
+    'Stai andando alla grande, non fermarti adesso.',
+    'La tua attenzione sta dando ottimi frutti, bravo.',
+    'Si vede che hai studiato, questa l\'hai presa al volo.',
+    'Il tuo impegno e visibile, vai avanti con questo ritmo.',
+    'Hai dimostrato di sapere la risposta, davvero bravo.',
+    'Ottima concentrazione, sei in forma smagliante.',
+    'Risposta perfetta, mantieni questa lucidita.',
+    'Questa l\'hai centrata senza esitazioni, continua cosi.',
+    'Stai facendo un lavoro eccezionale, vai avanti deciso.',
+    'Hai colpito nel segno, sei sulla strada giusta.',
+    'Bravo davvero, le tue risposte sono precise.'
+];
+const WRONG_FEEDBACK_TITLES = [
+    'Riproviamo!',
+    'Non era questa volta',
+    'Quasi ci sei',
+    'Coraggio!',
+    'Niente paura',
+    'Su, ci sei vicino',
+    'Concentrati!',
+    'Ce la puoi fare',
+    'Non mollare',
+    'Forza, alla prossima',
+    'Un passo indietro',
+    'Sbaglia chi non prova'
+];
+const WRONG_FEEDBACK_SUBTITLES = [
+    'Respira con calma, leggi bene la domanda e riprova alla prossima.',
+    'Presta piu attenzione alle parole della domanda, ce la farai.',
+    'Ogni errore e un passo in avanti, non perdere la fiducia.',
+    'Prenditi il tuo tempo, alla prossima sarai piu lucido.',
+    'Concentrati sulle parole chiave della domanda e vedrai che migliori.',
+    'Anche sbagliando si impara, vai avanti con determinazione.',
+    'Forza, dai il massimo della concentrazione sulla prossima domanda.',
+    'Non perderti d\'animo, hai tutte le carte per riuscirci.',
+    'Sii paziente con te stesso, la prossima la prendi al volo.',
+    'Rallenta, rileggi con calma e ascolta bene le opzioni.',
+    'Tieni alta l\'attenzione, alla prossima darai il meglio di te.',
+    'Coraggio, sei piu bravo di quello che pensi, riprova con calma.'
+];
+const FEEDBACK_PARTICLE_COLORS = ['#71f79f', '#2de2e6', '#ffd166', '#ff7b9c', '#7cc8ff', '#ffffff'];
+
+let feedbackHideTimer = null;
+let feedbackClassTimer = null;
+
+function pickFeedbackText(items) {
+    return items[Math.floor(Math.random() * items.length)];
+}
+
+function spawnFeedbackParticles() {
+    if (!answerFeedbackParticles) {
+        return;
+    }
+    answerFeedbackParticles.innerHTML = '';
+    const count = 28;
+    for (let i = 0; i < count; i += 1) {
+        const particle = document.createElement('span');
+        particle.className = 'answer-feedback__particle';
+        const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
+        const distance = 150 + Math.random() * 130;
+        const size = 8 + Math.random() * 9;
+        particle.style.setProperty('--tx', `${Math.cos(angle) * distance}px`);
+        particle.style.setProperty('--ty', `${Math.sin(angle) * distance}px`);
+        particle.style.setProperty('--rot', `${Math.random() * 600 - 300}deg`);
+        particle.style.setProperty('--delay', `${Math.random() * 0.18}s`);
+        particle.style.background = FEEDBACK_PARTICLE_COLORS[i % FEEDBACK_PARTICLE_COLORS.length];
+        particle.style.width = `${size}px`;
+        particle.style.height = `${size}px`;
+        if (Math.random() < 0.45) {
+            particle.style.borderRadius = '50%';
+        }
+        answerFeedbackParticles.appendChild(particle);
+    }
+}
+
+function showAnswerFeedback(isCorrect) {
+    const title = isCorrect
+        ? pickFeedbackText(CORRECT_FEEDBACK_TITLES)
+        : pickFeedbackText(WRONG_FEEDBACK_TITLES);
+    const subtitle = isCorrect
+        ? pickFeedbackText(CORRECT_FEEDBACK_SUBTITLES)
+        : pickFeedbackText(WRONG_FEEDBACK_SUBTITLES);
+
+    if (!answerFeedback) {
+        return { title, subtitle };
+    }
+    window.clearTimeout(feedbackHideTimer);
+    window.clearTimeout(feedbackClassTimer);
+
+    answerFeedback.classList.remove('answer-feedback--correct', 'answer-feedback--wrong');
+    answerFeedback.classList.add(isCorrect ? 'answer-feedback--correct' : 'answer-feedback--wrong');
+
+    if (answerFeedbackBadge) {
+        answerFeedbackBadge.textContent = isCorrect ? '★' : '✨';
+    }
+    if (answerFeedbackTitle) {
+        answerFeedbackTitle.textContent = title;
+    }
+    if (answerFeedbackSubtitle) {
+        answerFeedbackSubtitle.textContent = subtitle;
+    }
+
+    if (isCorrect) {
+        spawnFeedbackParticles();
+    } else if (answerFeedbackParticles) {
+        answerFeedbackParticles.innerHTML = '';
+    }
+
+    answerFeedback.classList.remove('hidden');
+    requestAnimationFrame(() => {
+        answerFeedback.classList.add('is-active');
+    });
+
+    if (quizCardStudent) {
+        quizCardStudent.classList.remove('is-correct-flash', 'is-wrong-flash');
+        void quizCardStudent.offsetWidth;
+        quizCardStudent.classList.add(isCorrect ? 'is-correct-flash' : 'is-wrong-flash');
+    }
+
+    feedbackHideTimer = window.setTimeout(() => {
+        hideAnswerFeedback();
+    }, CONFIG.answerFeedbackVisibleMs);
+
+    return { title, subtitle };
+}
+
+function hideAnswerFeedback() {
+    window.clearTimeout(feedbackHideTimer);
+    window.clearTimeout(feedbackClassTimer);
+    if (quizCardStudent) {
+        quizCardStudent.classList.remove('is-correct-flash', 'is-wrong-flash');
+    }
+    if (!answerFeedback) {
+        return;
+    }
+    answerFeedback.classList.remove('is-active');
+    feedbackClassTimer = window.setTimeout(() => {
+        answerFeedback.classList.add('hidden');
+        answerFeedback.classList.remove('answer-feedback--correct', 'answer-feedback--wrong');
+        if (answerFeedbackParticles) {
+            answerFeedbackParticles.innerHTML = '';
+        }
+    }, 320);
+}
+
 function confirmSelection(source) {
     if (selectedIndex === null || simulationCompleted) {
         return;
@@ -1710,15 +2256,21 @@ function confirmSelection(source) {
     answerLockedIndex = selectedIndex;
     setState('answered');
     setCommandState('Risposta registrata');
-    playChime('confirm');
 
     const isCorrect = answerLockedIndex === currentQuestion().correctIndex;
-    const feedback = isCorrect
-        ? `Risposta confermata. ${OPTION_LETTERS[answerLockedIndex]}. Corretta.`
-        : `Risposta confermata. ${OPTION_LETTERS[answerLockedIndex]}. Registrata.`;
+    playChime(isCorrect ? 'success' : 'miss');
 
-    logEvent(`${source}: risposta ${OPTION_LETTERS[answerLockedIndex]} confermata.`);
-    speakText(feedback, { interrupt: true, rate: 1.02 });
+    const { title, subtitle } = showAnswerFeedback(isCorrect);
+    const spokenFeedback = `${title} ${subtitle}`;
+
+    logEvent(`${source}: risposta ${OPTION_LETTERS[answerLockedIndex]} confermata (${isCorrect ? 'corretta' : 'errata'}).`);
+    window.setTimeout(() => {
+        speakText(spokenFeedback, {
+            interrupt: true,
+            rate: 1.0,
+            pitch: isCorrect ? 1.08 : 0.97
+        });
+    }, 320);
 
     nextQuestionTimer = window.setTimeout(() => {
         advanceQuestion();
@@ -1739,7 +2291,7 @@ function handleScrollCommand(source) {
         setState('focus');
         setCommandState('Scroll: risposta A');
         logEvent(`${source}: attivata la navigazione sulla risposta A.`);
-        speakText(`Navigazione attiva. Risposta A. ${currentQuestion().options[0]}.`, {
+        speakText(`Navigazione attiva. ${currentQuestion().options[0]}.`, {
             interrupt: true,
             rate: 1.05
         });
@@ -1752,7 +2304,7 @@ function handleScrollCommand(source) {
         setCommandState(`Scroll: risposta ${OPTION_LETTERS[focusedIndex]}`);
         syncChoices();
         logEvent(`${source}: focus spostato sulla risposta ${OPTION_LETTERS[focusedIndex]}.`);
-        speakText(`${OPTION_LETTERS[focusedIndex]}. ${currentQuestion().options[focusedIndex]}.`, {
+        speakText(`${currentQuestion().options[focusedIndex]}.`, {
             interrupt: true,
             rate: 1.08,
             pitch: 1.05
@@ -1982,6 +2534,7 @@ function onResults(results) {
         latestEarRight = rightEar;
         latestEarLeft = leftEar;
         latestMar = mar;
+        latestFraming = computeFramingFromLandmarks(landmarks, true);
 
         updateSensorCard(elRightEyeCard, elRightEyeStatus, elRightEyeEar, rightEar, EAR_THRESHOLD, 'eye');
         updateSensorCard(elLeftEyeCard, elLeftEyeStatus, elLeftEyeEar, leftEar, EAR_THRESHOLD, 'eye');
@@ -1990,6 +2543,7 @@ function onResults(results) {
         updateChoiceMachine(leftEar, rightEar, mar, true);
     } else {
         lastFaceDetected = false;
+        latestFraming = createEmptyFraming(true);
         updateZoomCanvas(null, null);
         updateChoiceMachine(latestEarLeft, latestEarRight, latestMar, false);
     }
@@ -2051,6 +2605,31 @@ async function startCamera() {
         logEvent('Errore nell accesso alla webcam.');
         alert('Impossibile accedere alla webcam. Verifica i permessi del browser.');
     }
+}
+
+async function stopCamera() {
+    if (!isRunning) {
+        return;
+    }
+    try {
+        if (camera) {
+            await camera.stop();
+        }
+        if (videoElement.srcObject) {
+            videoElement.srcObject.getTracks().forEach((track) => track.stop());
+            videoElement.srcObject = null;
+        }
+    } catch (error) {
+        console.warn('Errore durante lo stop della webcam:', error);
+    }
+    isRunning = false;
+    lastFaceDetected = false;
+    latestFraming = createEmptyFraming(false);
+    cameraState.textContent = 'Webcam non avviata';
+    startBtn.disabled = false;
+    startBtn.textContent = 'Avvia webcam';
+    loadingOverlay.classList.remove('active');
+    logEvent('Webcam disattivata per la modalita presentazione.');
 }
 
 function sleep(ms) {
@@ -2134,7 +2713,10 @@ async function runAutomaticDemo() {
     demoRunning = false;
 }
 
-startBtn.addEventListener('click', startCamera);
+startBtn.addEventListener('click', () => {
+    document.documentElement.requestFullscreen().catch(() => {});
+    startCamera();
+});
 readQuestionBtn.addEventListener('click', () => {
     ensureAudioContext();
     readCurrentQuestion();
@@ -2232,6 +2814,22 @@ resetCurrentFlow(true);
 logEvent('Profilo calibrato caricato: EAR 0.13, MAR 0.17, occhiali attivi.');
 setCommandState('In attesa');
 startRemoteSync();
+void loadDefaultSubjectQuestions();
+
+async function loadDefaultSubjectQuestions() {
+    try {
+        const raw = await fetchJson(`/domande/${DEFAULT_SUBJECT}.json`);
+        if (!Array.isArray(raw) || raw.length === 0) {
+            return;
+        }
+        const normalized = raw.map((question, index) => normalizeQuestion(question, index));
+        questionSet = cloneQuestionSet(normalized);
+        resetCurrentFlow(true);
+        logEvent(`Domande iniziali caricate dalla materia ${DEFAULT_SUBJECT} (${questionSet.length}).`);
+    } catch (error) {
+        logEvent(`Materia di default non caricata (${error.message}). Uso il set incluso.`);
+    }
+}
 
 
 

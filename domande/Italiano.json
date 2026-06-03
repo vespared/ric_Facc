@@ -1,0 +1,13 @@
+[
+  {
+    "title": "Manzoni e la lingua de I Promessi Sposi",
+    "prompt": "Perché Manzoni scelse una lingua semplice e quale modello usò?",
+    "options": [
+      "Voleva usare il latino per rivolgersi solo ai nobili e ai dotti.",
+      "Voleva il fiorentino parlato dai colti per unificare l'Italia.",
+      "Voleva scrivere in dialetto milanese perché era più spontaneo.",
+      "Voleva creare una lingua complicata per dimostrare la sua bravura."
+    ],
+    "correctIndex": 1
+  }
+]

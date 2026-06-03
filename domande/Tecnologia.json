@@ -1,0 +1,13 @@
+[
+  {
+    "title": "Internet e la diffusione delle notizie",
+    "prompt": "Qual è il fattore principale che rende il gossip moderno diverso da quello del Seicento?",
+    "options": [
+      "La lentezza con cui le notizie vengono scambiate tramite email.",
+      "La presenza di algoritmi sui Social Network che rendono la diffusione istantanea e virale.",
+      "Il fatto che oggi le persone non diano più importanza alla propria reputazione.",
+      "L'uso esclusivo di lettere scritte a mano per comunicare i segreti."
+    ],
+    "correctIndex": 1
+  }
+]

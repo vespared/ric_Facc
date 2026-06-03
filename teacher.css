@@ -228,12 +228,298 @@
     word-break: break-word;
 }
 
+.teacher-btn-full {
+    grid-column: 1 / -1;
+}
+
+.teacher-framing-toggle.is-active {
+    border-color: rgba(45, 226, 230, 0.7);
+    box-shadow: 0 0 0 3px rgba(45, 226, 230, 0.18);
+}
+
+.teacher-framing-card {
+    margin-top: 18px;
+    display: grid;
+    gap: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.teacher-framing-card.is-ok {
+    border-color: rgba(113, 247, 159, 0.5);
+    box-shadow: 0 18px 36px rgba(113, 247, 159, 0.12);
+}
+
+.teacher-framing-card.is-warning {
+    border-color: rgba(255, 209, 102, 0.5);
+    box-shadow: 0 18px 36px rgba(255, 209, 102, 0.12);
+}
+
+.teacher-framing-card.is-error {
+    border-color: rgba(255, 107, 107, 0.55);
+    box-shadow: 0 18px 36px rgba(255, 107, 107, 0.14);
+}
+
+.teacher-framing-card.is-inactive {
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.teacher-framing-privacy {
+    margin: 0;
+    padding: 10px 14px;
+    border-radius: 14px;
+    background: rgba(45, 226, 230, 0.08);
+    border: 1px solid rgba(45, 226, 230, 0.18);
+    color: var(--muted);
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+.teacher-framing-layout {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(200px, 1fr);
+    gap: 18px;
+    align-items: stretch;
+}
+
+.teacher-framing-scene {
+    border-radius: 18px;
+    background: rgba(15, 28, 51, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+}
+
+.teacher-framing-scene svg {
+    width: 100%;
+    height: auto;
+    max-height: 240px;
+    font-family: inherit;
+}
+
+.framing-frame {
+    fill: rgba(255, 255, 255, 0.02);
+    stroke: rgba(255, 255, 255, 0.18);
+    stroke-width: 1.5;
+    stroke-dasharray: 6 4;
+}
+
+.framing-safe {
+    fill: none;
+    stroke: rgba(45, 226, 230, 0.22);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+}
+
+.framing-face rect {
+    fill: rgba(255, 255, 255, 0.04);
+    stroke: rgba(255, 255, 255, 0.25);
+    stroke-width: 1.5;
+    transition: stroke 0.2s ease, fill 0.2s ease;
+}
+
+.framing-face.is-ok rect {
+    stroke: rgba(113, 247, 159, 0.65);
+    fill: rgba(113, 247, 159, 0.06);
+}
+
+.framing-face.is-warning rect {
+    stroke: rgba(255, 209, 102, 0.7);
+    fill: rgba(255, 209, 102, 0.07);
+}
+
+.framing-face.is-error rect {
+    stroke: rgba(255, 107, 107, 0.75);
+    fill: rgba(255, 107, 107, 0.08);
+}
+
+.framing-marker text {
+    fill: var(--text);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.framing-marker circle,
+.framing-marker ellipse {
+    stroke: rgba(255, 255, 255, 0.85);
+    stroke-width: 1.4;
+    fill: rgba(255, 255, 255, 0.18);
+    transition: fill 0.2s ease, stroke 0.2s ease;
+}
+
+.framing-marker.is-ok circle,
+.framing-marker.is-ok ellipse {
+    fill: rgba(113, 247, 159, 0.55);
+    stroke: rgba(113, 247, 159, 0.95);
+}
+
+.framing-marker.is-warning circle,
+.framing-marker.is-warning ellipse {
+    fill: rgba(255, 209, 102, 0.55);
+    stroke: rgba(255, 209, 102, 0.95);
+}
+
+.framing-marker.is-error circle,
+.framing-marker.is-error ellipse {
+    fill: rgba(255, 107, 107, 0.55);
+    stroke: rgba(255, 107, 107, 0.95);
+}
+
+.framing-no-face {
+    fill: rgba(255, 107, 107, 0.85);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.teacher-framing-info {
+    display: grid;
+    gap: 12px;
+    align-content: start;
+}
+
+.teacher-framing-message {
+    margin: 0;
+    color: var(--text);
+    font-size: 0.96rem;
+    line-height: 1.45;
+}
+
+.teacher-framing-badges {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+}
+
+.framing-badge {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.framing-badge-label {
+    color: var(--text);
+    font-size: 0.92rem;
+    font-weight: 600;
+}
+
+.framing-badge-state {
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.framing-badge.is-ok {
+    border-color: rgba(113, 247, 159, 0.45);
+    background: rgba(113, 247, 159, 0.08);
+}
+
+.framing-badge.is-ok .framing-badge-state {
+    background: rgba(113, 247, 159, 0.2);
+    color: var(--green);
+}
+
+.framing-badge.is-warning {
+    border-color: rgba(255, 209, 102, 0.45);
+    background: rgba(255, 209, 102, 0.08);
+}
+
+.framing-badge.is-warning .framing-badge-state {
+    background: rgba(255, 209, 102, 0.2);
+    color: #ffd166;
+}
+
+.framing-badge.is-error {
+    border-color: rgba(255, 107, 107, 0.55);
+    background: rgba(255, 107, 107, 0.1);
+}
+
+.framing-badge.is-error .framing-badge-state {
+    background: rgba(255, 107, 107, 0.2);
+    color: var(--red);
+}
+
+.framing-badge.is-idle .framing-badge-state {
+    color: var(--muted);
+}
+
+.subject-areas {
+    display: grid;
+    gap: 14px;
+}
+
+.subject-area {
+    display: grid;
+    gap: 8px;
+}
+
+.subject-area-label {
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.subject-btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.subject-btn-row .action-btn {
+    flex: 0 1 auto;
+    padding: 10px 16px;
+    font-size: 0.88rem;
+    border-radius: 14px;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.subject-btn.is-active {
+    border-color: rgba(45, 226, 230, 0.75);
+    background: rgba(45, 226, 230, 0.1);
+    box-shadow: 0 0 0 3px rgba(45, 226, 230, 0.14);
+}
+
+.teacher-subject-preview {
+    margin: 14px 0 12px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: rgba(45, 226, 230, 0.07);
+    border: 1px solid rgba(45, 226, 230, 0.2);
+    color: var(--text);
+    font-size: 0.92rem;
+    line-height: 1.45;
+}
+
 @media (max-width: 1180px) {
     .teacher-live-bar {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .teacher-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 900px) {
+    .teacher-framing-layout {
         grid-template-columns: 1fr;
     }
 }
@@ -249,6 +535,39 @@
     .teacher-command-grid,
     .teacher-submit-grid,
     .teacher-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Pannello esame guidato (fine materia / fine esame) */
+.teacher-exam-flow-card {
+    border: 1px solid rgba(255, 209, 102, 0.45);
+    box-shadow: 0 0 0 3px rgba(255, 209, 102, 0.12);
+}
+
+.teacher-exam-flow-message {
+    margin: 14px 0 16px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: rgba(255, 209, 102, 0.08);
+    border: 1px solid rgba(255, 209, 102, 0.28);
+    color: var(--text);
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.teacher-exam-flow-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.teacher-exam-flow-actions:has(.action-btn:only-child) {
+    grid-template-columns: 1fr;
+}
+
+@media (max-width: 720px) {
+    .teacher-exam-flow-actions {
         grid-template-columns: 1fr;
     }
 }

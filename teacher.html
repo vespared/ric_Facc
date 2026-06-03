@@ -6,8 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ric_Facc | Pannello docente</title>
 
-    <script src="https://cdn.jsdelivr.net/npm/mammoth/mammoth.browser.min.js" crossorigin="anonymous"></script>
-
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap"
@@ -90,8 +88,173 @@
                         <button id="teacherScrollBtn" class="action-btn accent">Scroll risposta</button>
                         <button id="teacherSelectBtn" class="action-btn accent">Seleziona / Annulla</button>
                         <button id="teacherConfirmBtn" class="action-btn primary">Conferma risposta</button>
+                        <button id="teacherRepeatQuestionBtn" class="action-btn secondary">Ripeti domanda</button>
+                        <button id="teacherNextQuestionBtn" class="action-btn accent">Domanda successiva</button>
                         <button id="teacherResetBtn" class="action-btn secondary">Resetta quiz</button>
+                        <button id="teacherFramingBtn" class="action-btn secondary teacher-framing-toggle">Verifica inquadratura webcam</button>
                     </div>
+                </div>
+
+                <div class="quiz-card teacher-framing-card" id="teacherFramingCard" hidden>
+                    <div class="card-topline">
+                        <span class="card-kicker">Inquadratura webcam</span>
+                        <span class="card-status" id="teacherFramingStatus">In attesa di dati dal PC...</span>
+                    </div>
+
+                    <p class="teacher-framing-privacy">
+                        Privacy: nessuna immagine viene trasmessa al tablet. Solo coordinate astratte calcolate dal PC.
+                    </p>
+
+                    <div class="teacher-framing-layout">
+                        <div class="teacher-framing-scene" aria-hidden="true">
+                            <svg id="teacherFramingScene" viewBox="0 0 200 150" preserveAspectRatio="xMidYMid meet">
+                                <rect class="framing-frame" x="2" y="2" width="196" height="146" rx="14"></rect>
+                                <rect id="framingSafeArea" class="framing-safe" x="12" y="9" width="176" height="132" rx="10"></rect>
+                                <g id="framingFaceGroup" class="framing-face" opacity="0">
+                                    <rect id="framingFaceBox" x="40" y="30" width="120" height="90" rx="40"></rect>
+                                </g>
+                                <g id="framingMouthMarker" class="framing-marker framing-marker--mouth" opacity="0">
+                                    <ellipse cx="0" cy="0" rx="14" ry="6"></ellipse>
+                                    <text x="0" y="22" text-anchor="middle">bocca</text>
+                                </g>
+                                <g id="framingLeftEyeMarker" class="framing-marker framing-marker--eye" opacity="0">
+                                    <circle cx="0" cy="0" r="7"></circle>
+                                    <text x="0" y="-13" text-anchor="middle">occhio sx</text>
+                                </g>
+                                <g id="framingRightEyeMarker" class="framing-marker framing-marker--eye" opacity="0">
+                                    <circle cx="0" cy="0" r="7"></circle>
+                                    <text x="0" y="-13" text-anchor="middle">occhio dx</text>
+                                </g>
+                                <text id="framingNoFaceLabel" class="framing-no-face" x="100" y="80" text-anchor="middle" opacity="0">
+                                    Volto non rilevato
+                                </text>
+                            </svg>
+                        </div>
+
+                        <div class="teacher-framing-info">
+                            <p class="teacher-framing-message" id="teacherFramingMessage">In attesa dei dati dal PC.</p>
+                            <ul class="teacher-framing-badges">
+                                <li id="framingBadgeFace" class="framing-badge">
+                                    <span class="framing-badge-label">Volto</span>
+                                    <span class="framing-badge-state">-</span>
+                                </li>
+                                <li id="framingBadgeLeftEye" class="framing-badge">
+                                    <span class="framing-badge-label">Occhio sinistro</span>
+                                    <span class="framing-badge-state">-</span>
+                                </li>
+                                <li id="framingBadgeRightEye" class="framing-badge">
+                                    <span class="framing-badge-label">Occhio destro</span>
+                                    <span class="framing-badge-state">-</span>
+                                </li>
+                                <li id="framingBadgeMouth" class="framing-badge">
+                                    <span class="framing-badge-label">Bocca</span>
+                                    <span class="framing-badge-state">-</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-card">
+                    <div class="card-topline">
+                        <span class="card-kicker">Presentazione video</span>
+                        <span class="card-status" id="teacherPresentationStatus">Nessun video attivo</span>
+                    </div>
+
+                    <div class="teacher-form-grid">
+                        <label class="teacher-field teacher-field-full">
+                            <span>File sul PC (es. presentazione.mp4) o URL diretta</span>
+                            <input id="teacherPresentationUrlInput" type="text" placeholder="presentazione.mp4">
+                        </label>
+                    </div>
+
+                    <div class="teacher-submit-grid">
+                        <button id="teacherOpenPresentationBtn" class="action-btn primary">Apri video sul PC</button>
+                        <button id="teacherClosePresentationBtn" class="action-btn secondary">Chiudi video</button>
+                    </div>
+
+                    <div class="teacher-submit-grid" id="teacherVideoControls" hidden>
+                        <button id="teacherVideoPlayBtn" class="action-btn primary">&#9654; Play</button>
+                        <button id="teacherVideoPauseBtn" class="action-btn secondary">&#9646;&#9646; Pausa</button>
+                        <button id="teacherVideoBackBtn" class="action-btn accent">&#8592; &minus;10s</button>
+                        <button id="teacherVideoForwardBtn" class="action-btn accent">+10s &#8594;</button>
+                        <button id="teacherVideoRestartBtn" class="action-btn secondary teacher-btn-full">&#9646;&#9632; Ricomincia dall'inizio</button>
+                    </div>
+                </div>
+
+                <div class="import-card teacher-subjects-card">
+                    <div class="card-topline">
+                        <span class="card-kicker">Banca domande per materia</span>
+                        <span class="card-status" id="teacherSubjectsStatus">Seleziona una materia per caricare le domande</span>
+                    </div>
+
+                    <div class="subject-areas">
+                        <div class="subject-area">
+                            <span class="subject-area-label">Area linguistica</span>
+                            <div class="subject-btn-row">
+                                <button class="action-btn secondary subject-btn" data-subject="Italiano">Italiano</button>
+                                <button class="action-btn secondary subject-btn" data-subject="Inglese">Inglese</button>
+                                <button class="action-btn secondary subject-btn" data-subject="Francese">Francese</button>
+                            </div>
+                        </div>
+                        <div class="subject-area">
+                            <span class="subject-area-label">Area storico-geografica</span>
+                            <div class="subject-btn-row">
+                                <button class="action-btn secondary subject-btn" data-subject="Storia">Storia</button>
+                                <button class="action-btn secondary subject-btn" data-subject="Geografia">Geografia</button>
+                            </div>
+                        </div>
+                        <div class="subject-area">
+                            <span class="subject-area-label">Area scientifica</span>
+                            <div class="subject-btn-row">
+                                <button class="action-btn secondary subject-btn" data-subject="Matematica">Matematica</button>
+                                <button class="action-btn secondary subject-btn" data-subject="Scienze">Scienze</button>
+                            </div>
+                        </div>
+                        <div class="subject-area">
+                            <span class="subject-area-label">Area artistica ed espressiva</span>
+                            <div class="subject-btn-row">
+                                <button class="action-btn secondary subject-btn" data-subject="Arte">Arte e Immagine</button>
+                                <button class="action-btn secondary subject-btn" data-subject="Musica">Ed. Musicale</button>
+                            </div>
+                        </div>
+                        <div class="subject-area">
+                            <span class="subject-area-label">Area pratica e motoria</span>
+                            <div class="subject-btn-row">
+                                <button class="action-btn secondary subject-btn" data-subject="Tecnologia">Tecnologia</button>
+                                <button class="action-btn secondary subject-btn" data-subject="EducazioneFisica">Ed. Fisica</button>
+                            </div>
+                        </div>
+                        <div class="subject-area">
+                            <span class="subject-area-label">Trasversale</span>
+                            <div class="subject-btn-row">
+                                <button class="action-btn secondary subject-btn" data-subject="EducazioneCivica">Ed. Civica</button>
+                            </div>
+                        </div>
+                        <div class="subject-area">
+                            <span class="subject-area-label">Opzionale</span>
+                            <div class="subject-btn-row">
+                                <button class="action-btn secondary subject-btn" data-subject="Religione">Religione Cattolica</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="teacherSubjectActions" hidden>
+                        <p id="teacherSubjectPreview" class="teacher-subject-preview"></p>
+                        <div class="teacher-submit-grid">
+                            <button id="teacherPublishSubjectBtn" class="action-btn primary">Pubblica subito</button>
+                            <button id="teacherQueueSubjectBtn" class="action-btn secondary">Aggiungi in coda</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="import-card teacher-exam-flow-card" id="teacherExamFlowCard" hidden>
+                    <div class="card-topline">
+                        <span class="card-kicker">Andamento esame</span>
+                        <span class="card-status" id="teacherExamFlowStatus">In attesa</span>
+                    </div>
+                    <p id="teacherExamFlowMessage" class="teacher-exam-flow-message"></p>
+                    <div id="teacherExamFlowActions" class="teacher-exam-flow-actions"></div>
                 </div>
 
                 <div class="import-card teacher-compose-card">
@@ -147,41 +310,6 @@
                         <button id="teacherPublishNowBtn" class="action-btn primary">Pubblica subito sul quiz</button>
                         <button id="teacherQueueNextBtn" class="action-btn secondary">Aggiungi come prossima</button>
                     </div>
-
-                    <div class="teacher-import-box">
-                        <div class="card-topline">
-                            <span class="card-kicker">Importa da Word</span>
-                            <span class="card-status" id="teacherImportStatus">Carica un file .docx con il formato domande</span>
-                        </div>
-
-                        <label class="file-picker teacher-file-picker" for="teacherQuestionDocxInput">
-                            <span>Carica file Word</span>
-                            <strong>DOCX con una o piu domande</strong>
-                        </label>
-                        <input id="teacherQuestionDocxInput" class="file-input" type="file" accept=".docx">
-
-                        <div class="teacher-submit-grid">
-                            <button id="teacherPublishDocxBtn" class="action-btn primary">Pubblica file subito</button>
-                            <button id="teacherQueueDocxBtn" class="action-btn secondary">Aggiungi file in coda</button>
-                        </div>
-
-                        <pre class="teacher-format-example">title: Domanda 1
-prompt: Testo della domanda
-A: Prima risposta
-B: Seconda risposta
-C: Terza risposta
-D: Quarta risposta
-correct: A
----
-title: Domanda 2</pre>
-                    </div>
-
-                    <ul class="format-list teacher-note-list">
-                        <li><strong>Pubblica subito:</strong> la nuova domanda entra immediatamente nel punto corrente del quiz.</li>
-                        <li><strong>Aggiungi come prossima:</strong> la domanda viene messa in coda subito dopo quella attuale.</li>
-                        <li><strong>Formato Word:</strong> ogni domanda deve usare le righe <code>title</code>, <code>prompt</code>, <code>A</code>, <code>B</code>, <code>C</code>, <code>D</code> e <code>correct</code>, separate con <code>---</code>.</li>
-                        <li><strong>Rete locale:</strong> tablet e PC devono essere collegati allo stesso server nella stessa rete.</li>
-                    </ul>
                 </div>
             </section>
         </main>

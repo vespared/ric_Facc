@@ -1,0 +1,13 @@
+[
+  {
+    "title": "Manzoni e Geolier: la difesa degli umili",
+    "prompt": "Qual è il punto d'unione principale tra Alessandro Manzoni e Geolier secondo il tuo percorso?",
+    "options": [
+      "Entrambi scrivono storie ambientate esclusivamente a New York per parlare di gossip.",
+      "Entrambi usano la loro lingua per dare voce agli \"umili\" e difenderli dai pregiudizi della società.",
+      "Entrambi sostengono che il pettegolezzo sia utile per migliorare la vita delle persone.",
+      "Entrambi hanno deciso di abbandonare le proprie radici per diventare famosi sui social."
+    ],
+    "correctIndex": 1
+  }
+]

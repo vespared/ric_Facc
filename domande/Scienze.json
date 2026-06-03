@@ -1,0 +1,13 @@
+[
+  {
+    "title": "La vista come parola",
+    "prompt": "Nel tuo percorso, qual è la differenza tra l'uso dell'occhio nel gossip e quello descritto nella tua citazione?",
+    "options": [
+      "Non c'è differenza: l'occhio serve solo a catturare la luce per vedere le immagini.",
+      "Nel gossip l'occhio si usa per leggere i libri, nella citazione per guardare la TV.",
+      "Nel gossip l'occhio serve per spiare e giudicare, mentre nella citazione diventa uno strumento per comunicare e includere.",
+      "L'occhio serve solo a scoprire i segreti degli altri per poi raccontarli agli amici."
+    ],
+    "correctIndex": 2
+  }
+]

@@ -16,7 +16,10 @@ const MIME_TYPES = {
     '.png': 'image/png',
     '.svg': 'image/svg+xml',
     '.txt': 'text/plain; charset=utf-8',
-    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
+    '.mov': 'video/quicktime'
 };
 
 const state = {
@@ -93,10 +96,11 @@ function serveStaticFile(urlPath, response) {
 
         const extension = path.extname(resolvedPath).toLowerCase();
         const contentType = MIME_TYPES[extension] || 'application/octet-stream';
+        const isCodeAsset = extension === '.html' || extension === '.js' || extension === '.css';
 
         response.writeHead(200, {
             'Content-Type': contentType,
-            'Cache-Control': extension === '.html' ? 'no-store' : 'public, max-age=60'
+            'Cache-Control': isCodeAsset ? 'no-store' : 'public, max-age=60'
         });
 
         fs.createReadStream(resolvedPath).pipe(response);
@@ -155,9 +159,11 @@ function handleApiRequest(request, response, url) {
                 state.nextCommandId += 1;
                 state.commands.push(command);
                 pruneCommands();
+                console.log(`[command] ricevuto da docente: id=${command.id} tipo=${command.type}`);
                 sendJson(response, 200, { ok: true, command });
             })
             .catch((error) => {
+                console.log(`[command] errore: ${error.message}`);
                 sendJson(response, 400, { error: error.message || 'Comando non valido.' });
             });
         return true;
@@ -165,11 +171,19 @@ function handleApiRequest(request, response, url) {
 
     if (request.method === 'GET' && url.pathname === '/api/commands') {
         const after = Number(url.searchParams.get('after') || 0);
-        const effectiveAfter = Math.max(after, state.latestAckedCommandId);
-        const commands = state.commands.filter((command) => command.id > effectiveAfter);
         const latestCommandId = state.commands.length > 0
             ? state.commands[state.commands.length - 1].id
             : 0;
+        // If the client's cursor is beyond what we know (e.g. server was restarted while
+        // the student tab kept its old counter), reset it to 0 so new commands surface.
+        const sanitizedAfter = after > latestCommandId ? 0 : after;
+        const effectiveAfter = Math.max(sanitizedAfter, state.latestAckedCommandId);
+        const commands = state.commands.filter((command) => command.id > effectiveAfter);
+
+        if (commands.length > 0) {
+            const ids = commands.map((command) => `${command.id}:${command.type}`).join(', ');
+            console.log(`[command] consegna allo studente (after=${after}): ${ids}`);
+        }
 
         sendJson(response, 200, {
             commands,
@@ -197,6 +211,7 @@ function handleApiRequest(request, response, url) {
                     ackedAt: new Date().toISOString()
                 };
 
+                console.log(`[command] ack dallo studente: id=${commandId} tipo=${state.lastStudentAck.type} stato=${state.lastStudentAck.status}`);
                 sendJson(response, 200, {
                     ok: true,
                     ackedCommandId: state.latestAckedCommandId,
