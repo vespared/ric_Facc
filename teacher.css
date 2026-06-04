@@ -508,6 +508,11 @@
     box-shadow: 0 0 0 3px rgba(45, 226, 230, 0.14);
 }
 
+#teacherPublishQuizNowTopBtn {
+    width: 100%;
+    margin-top: 16px;
+}
+
 .teacher-subject-preview {
     margin: 14px 0 12px;
     padding: 12px 14px;

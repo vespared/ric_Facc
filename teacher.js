@@ -801,7 +801,7 @@ window.addEventListener('beforeunload', () => {
 const teacherSubjectsStatus = document.getElementById('teacherSubjectsStatus');
 const teacherSubjectActions = document.getElementById('teacherSubjectActions');
 const teacherSubjectPreview = document.getElementById('teacherSubjectPreview');
-const teacherPublishSubjectBtn = document.getElementById('teacherPublishSubjectBtn');
+const teacherPublishQuizNowTopBtn = document.getElementById('teacherPublishQuizNowTopBtn');
 const teacherQueueSubjectBtn = document.getElementById('teacherQueueSubjectBtn');
 
 let loadedSubjectQuestions = null;
@@ -870,8 +870,8 @@ async function sendSubjectQuestionsCommand(commandType) {
     }
 }
 
-if (teacherPublishSubjectBtn) {
-    teacherPublishSubjectBtn.addEventListener('click', () => {
+if (teacherPublishQuizNowTopBtn) {
+    teacherPublishQuizNowTopBtn.addEventListener('click', () => {
         void sendSubjectQuestionsCommand('publish-batch');
     });
 }

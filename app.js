@@ -1075,6 +1075,12 @@ function publishQuestionBatchNow(rawQuestions, source = 'Tablet docente') {
         throw new Error('Nessuna domanda trovata nel file importato.');
     }
 
+    // Se lo studente sta guardando il video di presentazione, esce dalla
+    // modalita video e torna alla domanda appena pubblicata.
+    if (hidePresentationOverlay()) {
+        logEvent(`${source}: chiusa la presentazione video per mostrare la nuova domanda.`);
+    }
+
     // A materia conclusa, accoda il nuovo blocco in fondo (senza riproporre
     // l'ultima domanda della materia precedente); altrimenti pubblica in posizione corrente.
     const insertIndex = simulationCompleted
@@ -1157,6 +1163,23 @@ function playPresentationVideo() {
             video.play().catch(() => {});
         });
     }
+}
+
+// Chiude l'overlay del video di presentazione (se aperto), per tornare alla
+// visualizzazione della domanda. Restituisce true se era effettivamente aperto.
+function hidePresentationOverlay() {
+    const overlay = document.getElementById('presentationOverlay');
+    if (!overlay || overlay.style.display === 'none') {
+        return false;
+    }
+    const video = document.getElementById('presentationVideo');
+    if (video) {
+        video.pause();
+    }
+    setPresentationAudioHint(false);
+    overlay.style.display = 'none';
+    cameraWasRunningBeforePresentation = false;
+    return true;
 }
 
 // Un gesto utente (tocco/clic) sul PC studente permette di riattivare l'audio
