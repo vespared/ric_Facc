@@ -52,16 +52,32 @@ const framingBadgeMouth = document.getElementById('framingBadgeMouth');
 const FRAMING_SCENE_WIDTH = 200;
 const FRAMING_SCENE_HEIGHT = 150;
 let framingVisible = false;
-const PRESENTATION_FILE = 'Presentazione.mp4';
+// Diapositive di presentazione: le immagini nella cartella /presentazione, in ordine.
+// La prima (indice 0) viene mostrata automaticamente all'avvio dell'esame.
+const PRESENTATION_SLIDES = [
+    { file: '1_FRONTESPIZIO.png', label: 'Frontespizio' },
+    { file: '2_INTRODUZIONE.png', label: 'Introduzione' },
+    { file: '3_ITALIANO.png', label: 'Italiano' },
+    { file: '4_STORIA.png', label: 'Storia' },
+    { file: '5_GEOGRAFIA.png', label: 'Geografia' },
+    { file: '6_TECNOLOGIA.png', label: 'Tecnologia' },
+    { file: '7_MUSICA.png', label: 'Musica' },
+    { file: '8_ARTE.png', label: 'Arte' },
+    { file: '9_SCIENZA.png', label: 'Scienza' },
+    { file: '10_EDUCAZ_CIVICA.png', label: 'Educazione civica' },
+    { file: '11_EDUCAZIONE_FISICA.png', label: 'Educazione fisica' },
+    { file: '12_INGLESE.png', label: 'Inglese' },
+    { file: '13_FRANCESE.png', label: 'Francese' },
+    { file: '14_RELIGIONE.png', label: 'Religione' },
+    { file: '15_CONCLUSIONI.png', label: 'Conclusioni' }
+];
 const teacherPresentationStatus = document.getElementById('teacherPresentationStatus');
-const teacherOpenPresentationBtn = document.getElementById('teacherOpenPresentationBtn');
-const teacherClosePresentationBtn = document.getElementById('teacherClosePresentationBtn');
-const teacherVideoControls = document.getElementById('teacherVideoControls');
-const teacherVideoPlayBtn = document.getElementById('teacherVideoPlayBtn');
-const teacherVideoPauseBtn = document.getElementById('teacherVideoPauseBtn');
-const teacherVideoBackBtn = document.getElementById('teacherVideoBackBtn');
-const teacherVideoForwardBtn = document.getElementById('teacherVideoForwardBtn');
-const teacherVideoRestartBtn = document.getElementById('teacherVideoRestartBtn');
+const teacherSlideSelect = document.getElementById('teacherSlideSelect');
+const teacherSlidePrevBtn = document.getElementById('teacherSlidePrevBtn');
+const teacherSlideNextBtn = document.getElementById('teacherSlideNextBtn');
+const teacherShowSlideBtn = document.getElementById('teacherShowSlideBtn');
+const teacherCloseSlideBtn = document.getElementById('teacherCloseSlideBtn');
+let currentSlideIndex = 0;
 
 const teacherPublishNowBtn = document.getElementById('teacherPublishNowBtn');
 const teacherQueueNextBtn = document.getElementById('teacherQueueNextBtn');
@@ -101,20 +117,10 @@ function getCommandLabel(type) {
             return 'Pubblica file subito';
         case 'queue-batch':
             return 'Aggiungi file in coda';
-        case 'switch-to-presentation':
-            return 'Apri video';
-        case 'close-presentation':
-            return 'Chiudi video';
-        case 'video-play':
-            return 'Play video';
-        case 'video-pause':
-            return 'Pausa video';
-        case 'video-restart':
-            return 'Ricomincia video';
-        case 'video-skip-forward':
-            return 'Avanti 10s';
-        case 'video-skip-backward':
-            return 'Indietro 10s';
+        case 'show-slide':
+            return 'Mostra diapositiva';
+        case 'close-slide':
+            return 'Chiudi diapositiva';
         case 'repeat-question':
             return 'Ripeti domanda';
         case 'next-question':
@@ -696,7 +702,10 @@ async function sendQuestionCommand(commandType) {
 
 if (teacherStartExamBtn) {
     teacherStartExamBtn.addEventListener('click', () => {
-        void sendCommand('start-exam');
+        // Avvia l'esame e subito dopo mostra la prima diapositiva sul PC.
+        void sendCommand('start-exam').then(() => {
+            showSlideAt(0);
+        });
     });
 }
 
@@ -751,37 +760,66 @@ if (teacherFramingBtn) {
     });
 }
 
-teacherOpenPresentationBtn.addEventListener('click', () => {
-    const url = '/' + PRESENTATION_FILE;
-    teacherPresentationStatus.textContent = 'Apertura in corso...';
-    void sendCommand('switch-to-presentation', { url }).then(() => {
-        teacherPresentationStatus.textContent = 'Video aperto sul PC.';
-        if (teacherVideoControls) teacherVideoControls.hidden = false;
-    });
-});
+// Popola il menu a tendina con le diapositive disponibili.
+function populateSlideSelect() {
+    if (!teacherSlideSelect) return;
+    teacherSlideSelect.innerHTML = PRESENTATION_SLIDES.map((slide, index) =>
+        `<option value="${index}">${index + 1} &middot; ${escapeHtml(slide.label)}</option>`
+    ).join('');
+    teacherSlideSelect.value = String(currentSlideIndex);
+}
 
-teacherClosePresentationBtn.addEventListener('click', () => {
-    teacherPresentationStatus.textContent = 'Chiusura in corso...';
-    void sendCommand('close-presentation').then(() => {
-        teacherPresentationStatus.textContent = 'Video chiuso.';
-        if (teacherVideoControls) teacherVideoControls.hidden = true;
-    });
-});
+function getCurrentSlide() {
+    return PRESENTATION_SLIDES[currentSlideIndex] || PRESENTATION_SLIDES[0];
+}
 
-if (teacherVideoPlayBtn) {
-    teacherVideoPlayBtn.addEventListener('click', () => { void sendCommand('video-play'); });
+// Mostra la diapositiva all'indice indicato sul PC dello studente.
+function showSlideAt(index) {
+    if (index < 0 || index >= PRESENTATION_SLIDES.length) return;
+    currentSlideIndex = index;
+    if (teacherSlideSelect) teacherSlideSelect.value = String(currentSlideIndex);
+    const slide = getCurrentSlide();
+    const url = '/presentazione/' + slide.file;
+    const label = `${currentSlideIndex + 1} - ${slide.label}`;
+    if (teacherPresentationStatus) teacherPresentationStatus.textContent = `Invio diapositiva ${label}...`;
+    void sendCommand('show-slide', { url, label }).then(() => {
+        if (teacherPresentationStatus) teacherPresentationStatus.textContent = `Diapositiva ${label} mostrata sul PC.`;
+    });
 }
-if (teacherVideoPauseBtn) {
-    teacherVideoPauseBtn.addEventListener('click', () => { void sendCommand('video-pause'); });
+
+populateSlideSelect();
+
+if (teacherSlideSelect) {
+    teacherSlideSelect.addEventListener('change', () => {
+        currentSlideIndex = Number(teacherSlideSelect.value) || 0;
+    });
 }
-if (teacherVideoRestartBtn) {
-    teacherVideoRestartBtn.addEventListener('click', () => { void sendCommand('video-restart'); });
+
+if (teacherShowSlideBtn) {
+    teacherShowSlideBtn.addEventListener('click', () => {
+        showSlideAt(Number(teacherSlideSelect && teacherSlideSelect.value) || 0);
+    });
 }
-if (teacherVideoBackBtn) {
-    teacherVideoBackBtn.addEventListener('click', () => { void sendCommand('video-skip-backward'); });
+
+if (teacherSlidePrevBtn) {
+    teacherSlidePrevBtn.addEventListener('click', () => {
+        showSlideAt(Math.max(0, currentSlideIndex - 1));
+    });
 }
-if (teacherVideoForwardBtn) {
-    teacherVideoForwardBtn.addEventListener('click', () => { void sendCommand('video-skip-forward'); });
+
+if (teacherSlideNextBtn) {
+    teacherSlideNextBtn.addEventListener('click', () => {
+        showSlideAt(Math.min(PRESENTATION_SLIDES.length - 1, currentSlideIndex + 1));
+    });
+}
+
+if (teacherCloseSlideBtn) {
+    teacherCloseSlideBtn.addEventListener('click', () => {
+        if (teacherPresentationStatus) teacherPresentationStatus.textContent = 'Chiusura in corso...';
+        void sendCommand('close-slide').then(() => {
+            if (teacherPresentationStatus) teacherPresentationStatus.textContent = 'Diapositiva chiusa.';
+        });
+    });
 }
 
 teacherPublishNowBtn.addEventListener('click', () => {

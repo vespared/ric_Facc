@@ -159,23 +159,25 @@
 
                 <div class="control-card">
                     <div class="card-topline">
-                        <span class="card-kicker">Presentazione video</span>
-                        <span class="card-status" id="teacherPresentationStatus">Nessun video attivo</span>
+                        <span class="card-kicker">Presentazione diapositive</span>
+                        <span class="card-status" id="teacherPresentationStatus">Nessuna diapositiva attiva</span>
                     </div>
 
-                    <p class="teacher-presentation-note">Verra' usato automaticamente il file <strong>Presentazione.mp4</strong> presente nella cartella del programma.</p>
+                    <p class="teacher-presentation-note">Le diapositive sono le immagini nella cartella <strong>/presentazione</strong>. All'avvio dell'esame viene mostrata automaticamente la diapositiva 1.</p>
+
+                    <div class="teacher-slide-controls">
+                        <label class="teacher-slide-label" for="teacherSlideSelect">Diapositiva da mostrare</label>
+                        <select id="teacherSlideSelect" class="teacher-slide-select"></select>
+                    </div>
 
                     <div class="teacher-submit-grid">
-                        <button id="teacherOpenPresentationBtn" class="action-btn primary">Apri video sul PC</button>
-                        <button id="teacherClosePresentationBtn" class="action-btn secondary">Chiudi video</button>
+                        <button id="teacherSlidePrevBtn" class="action-btn accent">&#8592; Precedente</button>
+                        <button id="teacherSlideNextBtn" class="action-btn accent">Successiva &#8594;</button>
                     </div>
 
-                    <div class="teacher-submit-grid" id="teacherVideoControls" hidden>
-                        <button id="teacherVideoPlayBtn" class="action-btn primary">&#9654; Play</button>
-                        <button id="teacherVideoPauseBtn" class="action-btn secondary">&#9646;&#9646; Pausa</button>
-                        <button id="teacherVideoBackBtn" class="action-btn accent">&#8592; &minus;10s</button>
-                        <button id="teacherVideoForwardBtn" class="action-btn accent">+10s &#8594;</button>
-                        <button id="teacherVideoRestartBtn" class="action-btn secondary teacher-btn-full">&#9646;&#9632; Ricomincia dall'inizio</button>
+                    <div class="teacher-submit-grid">
+                        <button id="teacherShowSlideBtn" class="action-btn primary">Mostra diapositiva sul PC</button>
+                        <button id="teacherCloseSlideBtn" class="action-btn secondary">Chiudi diapositiva</button>
                     </div>
                 </div>
 

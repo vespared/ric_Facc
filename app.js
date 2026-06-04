@@ -1075,30 +1075,25 @@ function publishQuestionBatchNow(rawQuestions, source = 'Tablet docente') {
         throw new Error('Nessuna domanda trovata nel file importato.');
     }
 
-    // Se lo studente sta guardando il video di presentazione, esce dalla
-    // modalita video e torna alla domanda appena pubblicata.
-    if (hidePresentationOverlay()) {
-        logEvent(`${source}: chiusa la presentazione video per mostrare la nuova domanda.`);
+    // Se lo studente sta guardando una diapositiva di presentazione, la chiude
+    // e torna alla domanda appena pubblicata.
+    if (hideSlideOverlay()) {
+        logEvent(`${source}: chiusa la diapositiva per mostrare la nuova domanda.`);
     }
 
-    // A materia conclusa, accoda il nuovo blocco in fondo (senza riproporre
-    // l'ultima domanda della materia precedente); altrimenti pubblica in posizione corrente.
-    const insertIndex = simulationCompleted
-        ? questionSet.length
-        : Math.min(Math.max(currentQuestionIndex, 0), questionSet.length);
-    const insertedQuestions = insertQuestionsIntoFlow(rawQuestions, insertIndex);
-    const firstQuestion = insertedQuestions[0];
+    // "Pubblica subito" una materia intera SOSTITUISCE il quiz attivo con le sole
+    // domande del file: cosi il conteggio coincide sempre con il file caricato e non
+    // si sommano eventuali domande gia presenti (es. la materia caricata di default).
+    questionSet = cloneQuestionSet(rawQuestions);
+    const firstQuestion = questionSet[0];
 
     simulationCompleted = false;
-    currentQuestionIndex = insertIndex;
+    currentQuestionIndex = 0;
     resetCurrentFlow(false);
-    updateImportStatus(`File docente pubblicato da ${source} (${insertedQuestions.length} domande)`);
-    logEvent(`${source}: pubblicato file con ${insertedQuestions.length} domande. Ora attiva ${firstQuestion.title}.`);
-    speakText(`Nuovo file del docente pubblicato. ${firstQuestion.title}.`, {
-        interrupt: true,
-        rate: 1.03,
-        pitch: 1.05
-    });
+    updateImportStatus(`File docente pubblicato da ${source} (${questionSet.length} domande)`);
+    logEvent(`${source}: pubblicato file con ${questionSet.length} domande. Ora attiva ${firstQuestion.title}.`);
+    // La lettura vocale della domanda viene avviata dal gestore del comando
+    // (dopo l'attivazione della webcam), per non sovrapporre piu' annunci.
 }
 
 function queueQuestionBatchAsNext(rawQuestions, source = 'Tablet docente') {
@@ -1138,60 +1133,38 @@ function queueQuestionBatchAsNext(rawQuestions, source = 'Tablet docente') {
     });
 }
 
-function setPresentationAudioHint(visible) {
-    const hint = document.getElementById('presentationAudioHint');
-    if (hint) {
-        hint.style.display = visible ? 'block' : 'none';
+// Crea (se serve) e mostra l'overlay a schermo intero con la diapositiva
+// indicata dal docente. Ogni diapositiva e' un'immagine della cartella /presentazione.
+function showSlideOverlay(url) {
+    let overlay = document.getElementById('slideOverlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'slideOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#000;display:flex;align-items:center;justify-content:center';
+        const img = document.createElement('img');
+        img.id = 'slideImage';
+        img.alt = 'Diapositiva di presentazione';
+        img.style.cssText = 'max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain';
+        overlay.appendChild(img);
+        document.body.appendChild(overlay);
     }
+    const img = document.getElementById('slideImage');
+    if (img.getAttribute('src') !== url) {
+        img.src = url;
+    }
+    overlay.style.display = 'flex';
 }
 
-// Avvia il video di presentazione gestendo le policy di autoplay del browser:
-// se la riproduzione con audio viene bloccata (nessun gesto utente sul PC studente),
-// riparte in muto cosi il video procede comunque, mostrando l'invito a toccare lo schermo.
-function playPresentationVideo() {
-    const video = document.getElementById('presentationVideo');
-    if (!video) {
-        return;
-    }
-    video.muted = false;
-    setPresentationAudioHint(false);
-    const attempt = video.play();
-    if (attempt && typeof attempt.catch === 'function') {
-        attempt.catch(() => {
-            video.muted = true;
-            setPresentationAudioHint(true);
-            video.play().catch(() => {});
-        });
-    }
-}
-
-// Chiude l'overlay del video di presentazione (se aperto), per tornare alla
+// Chiude l'overlay della diapositiva (se aperto), per tornare alla
 // visualizzazione della domanda. Restituisce true se era effettivamente aperto.
-function hidePresentationOverlay() {
-    const overlay = document.getElementById('presentationOverlay');
+function hideSlideOverlay() {
+    const overlay = document.getElementById('slideOverlay');
     if (!overlay || overlay.style.display === 'none') {
         return false;
     }
-    const video = document.getElementById('presentationVideo');
-    if (video) {
-        video.pause();
-    }
-    setPresentationAudioHint(false);
     overlay.style.display = 'none';
     cameraWasRunningBeforePresentation = false;
     return true;
-}
-
-// Un gesto utente (tocco/clic) sul PC studente permette di riattivare l'audio
-// se il video era partito in muto per via dell'autoplay.
-function unmutePresentationVideo() {
-    const video = document.getElementById('presentationVideo');
-    if (!video || !video.muted) {
-        return;
-    }
-    video.muted = false;
-    setPresentationAudioHint(false);
-    video.play().catch(() => {});
 }
 
 async function executeRemoteCommand(command) {
@@ -1265,6 +1238,13 @@ async function executeRemoteCommand(command) {
 
     if (command.type === 'publish-batch') {
         publishQuestionBatchNow(payload.questions || [], 'Tablet docente');
+        // Pubblicando il quiz lo studente deve poter rispondere: attiva la webcam
+        // senza annunciarla, poi legge subito la domanda attiva.
+        if (!isRunning) {
+            logEvent('Quiz pubblicato: avvio automatico della webcam.');
+            await startCamera({ announce: false });
+        }
+        void readCurrentQuestion();
         return 'File di domande pubblicato subito sul PC.';
     }
 
@@ -1273,110 +1253,38 @@ async function executeRemoteCommand(command) {
         return 'File di domande aggiunto in coda sul PC.';
     }
 
-    if (command.type === 'switch-to-presentation') {
+    if (command.type === 'show-slide') {
         const url = String(payload.url || '').trim();
         if (!url || (!/^https?:\/\//i.test(url) && !url.startsWith('/'))) {
-            return 'Percorso o URL video non valido.';
+            return 'Percorso o URL diapositiva non valido.';
         }
-        cameraWasRunningBeforePresentation = isRunning;
-        if (isRunning) {
-            await stopCamera();
+        // La prima diapositiva aperta spegne la webcam, cosi resta libero lo
+        // schermo; verra' riattivata alla chiusura se era in funzione.
+        const overlayWasOpen = !!document.getElementById('slideOverlay')
+            && document.getElementById('slideOverlay').style.display !== 'none';
+        if (!overlayWasOpen) {
+            cameraWasRunningBeforePresentation = isRunning;
+            if (isRunning) {
+                await stopCamera();
+            }
         }
-        let overlay = document.getElementById('presentationOverlay');
-        if (!overlay) {
-            overlay = document.createElement('div');
-            overlay.id = 'presentationOverlay';
-            overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#000;display:flex;align-items:center;justify-content:center';
-            const video = document.createElement('video');
-            video.id = 'presentationVideo';
-            video.style.cssText = 'width:100%;height:100%;object-fit:contain';
-            video.preload = 'auto';
-            video.playsInline = true;
-            video.setAttribute('playsinline', '');
-            overlay.appendChild(video);
-
-            const hint = document.createElement('div');
-            hint.id = 'presentationAudioHint';
-            hint.textContent = 'Tocca lo schermo per attivare l\'audio del video';
-            hint.style.cssText = 'position:absolute;bottom:32px;left:50%;transform:translateX(-50%);padding:12px 22px;border-radius:999px;background:rgba(8,17,31,0.82);color:#f5f8ff;font-family:"Space Grotesk",sans-serif;font-size:18px;letter-spacing:0.02em;box-shadow:0 12px 30px rgba(0,0,0,0.45);display:none';
-            overlay.appendChild(hint);
-
-            // Un tocco/clic sullo schermo studente vale come gesto utente:
-            // riattiva l'audio se la riproduzione era partita in muto.
-            overlay.addEventListener('click', unmutePresentationVideo);
-
-            document.body.appendChild(overlay);
-        }
-        const video = document.getElementById('presentationVideo');
-        const requestedAbsUrl = (() => { try { return new URL(url, window.location.href).href; } catch (_) { return url; } })();
-        if ((video.currentSrc || '') !== requestedAbsUrl) {
-            video.src = url;
-            video.currentTime = 0;
-        }
-        overlay.style.display = 'flex';
-        playPresentationVideo();
-        logEvent('Video presentazione aperto dal tablet del docente.');
-        return 'Video aperto sul PC.';
+        showSlideOverlay(url);
+        const label = String(payload.label || '').trim();
+        logEvent(`Diapositiva mostrata dal tablet del docente${label ? `: ${label}` : ''}.`);
+        return `Diapositiva mostrata sul PC${label ? ` (${label})` : ''}.`;
     }
 
-    if (command.type === 'close-presentation') {
-        const overlay = document.getElementById('presentationOverlay');
-        if (overlay) {
-            const video = document.getElementById('presentationVideo');
-            if (video) {
-                video.pause();
-            }
-            setPresentationAudioHint(false);
-            overlay.style.display = 'none';
-        }
+    if (command.type === 'close-slide') {
+        hideSlideOverlay();
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen().catch(() => {});
         }
-        logEvent('Video presentazione chiuso dal tablet del docente.');
+        logEvent('Diapositiva chiusa dal tablet del docente.');
         if (cameraWasRunningBeforePresentation) {
             cameraWasRunningBeforePresentation = false;
             await startCamera();
         }
-        return 'Video chiuso sul PC.';
-    }
-
-    if (command.type === 'video-play') {
-        const video = document.getElementById('presentationVideo');
-        if (!video) return 'Nessun video aperto sul PC.';
-        playPresentationVideo();
-        logEvent('Tablet docente: play video.');
-        return 'Video in riproduzione sul PC.';
-    }
-
-    if (command.type === 'video-pause') {
-        const video = document.getElementById('presentationVideo');
-        if (!video) return 'Nessun video aperto sul PC.';
-        video.pause();
-        logEvent('Tablet docente: pausa video.');
-        return 'Video in pausa sul PC.';
-    }
-
-    if (command.type === 'video-restart') {
-        const video = document.getElementById('presentationVideo');
-        if (!video) return 'Nessun video aperto sul PC.';
-        video.currentTime = 0;
-        playPresentationVideo();
-        logEvent('Tablet docente: ricomincia video.');
-        return 'Video riavviato dall\'inizio sul PC.';
-    }
-
-    if (command.type === 'video-skip-forward') {
-        const video = document.getElementById('presentationVideo');
-        if (!video) return 'Nessun video aperto sul PC.';
-        video.currentTime = Math.min(video.duration || video.currentTime, video.currentTime + 10);
-        return 'Video avanzato di 10s sul PC.';
-    }
-
-    if (command.type === 'video-skip-backward') {
-        const video = document.getElementById('presentationVideo');
-        if (!video) return 'Nessun video aperto sul PC.';
-        video.currentTime = Math.max(0, video.currentTime - 10);
-        return 'Video indietro di 10s sul PC.';
+        return 'Diapositiva chiusa sul PC.';
     }
 
     if (command.type === 'next-question') {
@@ -1433,7 +1341,7 @@ function startExam() {
     resetCurrentFlow(true);
     setCommandState('Esame avviato');
     logEvent("Tablet docente: l'esame ha inizio.");
-    speakText("L'esame ha inizio. Ecco la prima domanda.", { interrupt: true, rate: 1.02, pitch: 1.04 });
+    speakText("L'esame ha inizio.", { interrupt: true, rate: 1.02, pitch: 1.04 });
 }
 
 function showExamThankYou() {
@@ -2729,7 +2637,7 @@ faceMesh.setOptions({
 
 faceMesh.onResults(onResults);
 
-async function startCamera() {
+async function startCamera({ announce = true } = {}) {
     if (isRunning) {
         return;
     }
@@ -2754,7 +2662,9 @@ async function startCamera() {
         cameraState.textContent = 'Webcam attiva e tracking pronto';
         startBtn.textContent = 'Webcam attiva';
         logEvent('Webcam attivata correttamente.');
-        speakText('Webcam attiva. Il sistema e pronto per il test.', { interrupt: true, rate: 1.03 });
+        if (announce) {
+            speakText('Webcam attiva. Il sistema e pronto per il test.', { interrupt: true, rate: 1.03 });
+        }
     } catch (error) {
         console.error('Errore webcam:', error);
         cameraState.textContent = 'Errore accesso webcam';
