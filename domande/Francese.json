@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "title": "Il calligramma",
+    "prompt": "Nei Promessi Sposi e nelle chat di oggi, perché il gossip e i pettegolezzi sono sbagliati?",
+    "options": [
+      "Perché aiutano a fare nuove amicizie.",
+      "Perché feriscono le persone e tolgono la libertà."
+    ],
+    "correctIndex": 1
+  }
+]

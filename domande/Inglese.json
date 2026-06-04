@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "title": "Il gioco corretto (Fair Play)",
+    "prompt": "Quale stella della nazionale inglese gioca come centrocampista nel Real Madrid?",
+    "options": [
+      "Jude Bellingham.",
+      "Lautaro Martínez."
+    ],
+    "correctIndex": 0
+  }
+]

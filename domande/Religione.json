@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "title": "Il valore delle parole",
+    "prompt": "Cosa ci insegna la religione su come dobbiamo usare le parole con gli altri?",
+    "options": [
+      "A non credere alle chiacchiere e a usare le parole per rispettare e voler bene a tutti.",
+      "A dare ascolto solo ai pettegolezzi che sembrano più interessanti o divertenti."
+    ],
+    "correctIndex": 0
+  }
+]

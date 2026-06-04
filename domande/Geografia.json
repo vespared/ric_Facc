@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "title": "New York e il gossip negli USA",
+    "prompt": "Qual è l'elemento comune tra la Monaca di Monza e le celebrità di New York citate nel paragrafo?",
+    "options": [
+      "Entrambe hanno scelto liberamente di diventare famose per guadagnare.",
+      "Entrambe vedono la propria vita privata trasformata in uno spettacolo pubblico e giudicato dalla società."
+    ],
+    "correctIndex": 1
+  }
+]

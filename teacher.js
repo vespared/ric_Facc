@@ -32,6 +32,7 @@ const teacherConfirmBtn = document.getElementById('teacherConfirmBtn');
 const teacherRepeatQuestionBtn = document.getElementById('teacherRepeatQuestionBtn');
 const teacherNextQuestionBtn = document.getElementById('teacherNextQuestionBtn');
 const teacherResetBtn = document.getElementById('teacherResetBtn');
+const teacherFinishExamBtn = document.getElementById('teacherFinishExamBtn');
 const teacherFramingBtn = document.getElementById('teacherFramingBtn');
 const teacherFramingCard = document.getElementById('teacherFramingCard');
 const teacherFramingStatus = document.getElementById('teacherFramingStatus');
@@ -51,7 +52,7 @@ const framingBadgeMouth = document.getElementById('framingBadgeMouth');
 const FRAMING_SCENE_WIDTH = 200;
 const FRAMING_SCENE_HEIGHT = 150;
 let framingVisible = false;
-const teacherPresentationUrlInput = document.getElementById('teacherPresentationUrlInput');
+const PRESENTATION_FILE = 'Presentazione.mp4';
 const teacherPresentationStatus = document.getElementById('teacherPresentationStatus');
 const teacherOpenPresentationBtn = document.getElementById('teacherOpenPresentationBtn');
 const teacherClosePresentationBtn = document.getElementById('teacherClosePresentationBtn');
@@ -168,12 +169,18 @@ function normalizeQuestion(rawQuestion, index) {
         : [rawQuestion.optionA || rawQuestion.a, rawQuestion.optionB || rawQuestion.b, rawQuestion.optionC || rawQuestion.c, rawQuestion.optionD || rawQuestion.d]
             .map((option) => String(option || '').trim());
 
+    // Scarta le opzioni vuote in coda: cosi sono ammesse le domande con sole 2 risposte
+    // (C e D assenti) oltre a quelle classiche con 4 opzioni.
+    while (options.length > 0 && !options[options.length - 1]) {
+        options.pop();
+    }
+
     if (!prompt) {
         throw new Error(`Domanda ${index + 1}: testo domanda mancante.`);
     }
 
-    if (options.length !== 4 || options.some((option) => !option)) {
-        throw new Error(`Domanda ${index + 1}: servono esattamente 4 opzioni compilate.`);
+    if (options.length < 2 || options.length > 4 || options.some((option) => !option)) {
+        throw new Error(`Domanda ${index + 1}: servono da 2 a 4 opzioni compilate.`);
     }
 
     return {
@@ -729,6 +736,15 @@ teacherResetBtn.addEventListener('click', () => {
     void sendCommand('reset-flow');
 });
 
+if (teacherFinishExamBtn) {
+    teacherFinishExamBtn.addEventListener('click', () => {
+        const conferma = window.confirm("Terminare l'esame e mostrare i saluti e i ringraziamenti finali sul PC dello studente?");
+        if (conferma) {
+            void finishExam();
+        }
+    });
+}
+
 if (teacherFramingBtn) {
     teacherFramingBtn.addEventListener('click', () => {
         setFramingVisible(!framingVisible);
@@ -736,13 +752,7 @@ if (teacherFramingBtn) {
 }
 
 teacherOpenPresentationBtn.addEventListener('click', () => {
-    const raw = teacherPresentationUrlInput.value.trim();
-    if (!raw) {
-        setActionStatus('Inserisci il nome del file o la URL del video.', true);
-        teacherPresentationStatus.textContent = 'File non specificato.';
-        return;
-    }
-    const url = /^https?:\/\//i.test(raw) ? raw : '/' + raw.replace(/^\/+/, '');
+    const url = '/' + PRESENTATION_FILE;
     teacherPresentationStatus.textContent = 'Apertura in corso...';
     void sendCommand('switch-to-presentation', { url }).then(() => {
         teacherPresentationStatus.textContent = 'Video aperto sul PC.';

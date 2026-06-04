@@ -212,6 +212,13 @@ function currentQuestion() {
     return questionSet[currentQuestionIndex];
 }
 
+// Le domande con due sole opzioni sono "a scelta libera": lo studente sceglie
+// tra le due alternative e la risposta viene accettata senza segnalare errori.
+function isFreeChoiceQuestion() {
+    const question = currentQuestion();
+    return !!question && Array.isArray(question.options) && question.options.length <= 2;
+}
+
 function createEmptyFraming(cameraRunning) {
     return {
         cameraRunning: Boolean(cameraRunning),
@@ -429,11 +436,17 @@ function normalizeQuestion(rawQuestion, index) {
         : [rawQuestion.optionA || rawQuestion.a, rawQuestion.optionB || rawQuestion.b, rawQuestion.optionC || rawQuestion.c, rawQuestion.optionD || rawQuestion.d]
             .map((option) => String(option || '').trim());
 
+    // Scarta le opzioni vuote in coda: cosi sono ammesse le domande con sole 2 risposte
+    // (C e D assenti) oltre a quelle classiche con 4 opzioni.
+    while (options.length > 0 && !options[options.length - 1]) {
+        options.pop();
+    }
+
     if (!prompt) {
         throw new Error(`Domanda ${index + 1}: testo domanda mancante.`);
     }
-    if (options.length !== 4 || options.some((option) => !option)) {
-        throw new Error(`Domanda ${index + 1}: servono esattamente 4 opzioni compilate.`);
+    if (options.length < 2 || options.length > 4 || options.some((option) => !option)) {
+        throw new Error(`Domanda ${index + 1}: servono da 2 a 4 opzioni compilate.`);
     }
 
     const correctIndex = resolveCorrectIndex(
@@ -1119,6 +1132,45 @@ function queueQuestionBatchAsNext(rawQuestions, source = 'Tablet docente') {
     });
 }
 
+function setPresentationAudioHint(visible) {
+    const hint = document.getElementById('presentationAudioHint');
+    if (hint) {
+        hint.style.display = visible ? 'block' : 'none';
+    }
+}
+
+// Avvia il video di presentazione gestendo le policy di autoplay del browser:
+// se la riproduzione con audio viene bloccata (nessun gesto utente sul PC studente),
+// riparte in muto cosi il video procede comunque, mostrando l'invito a toccare lo schermo.
+function playPresentationVideo() {
+    const video = document.getElementById('presentationVideo');
+    if (!video) {
+        return;
+    }
+    video.muted = false;
+    setPresentationAudioHint(false);
+    const attempt = video.play();
+    if (attempt && typeof attempt.catch === 'function') {
+        attempt.catch(() => {
+            video.muted = true;
+            setPresentationAudioHint(true);
+            video.play().catch(() => {});
+        });
+    }
+}
+
+// Un gesto utente (tocco/clic) sul PC studente permette di riattivare l'audio
+// se il video era partito in muto per via dell'autoplay.
+function unmutePresentationVideo() {
+    const video = document.getElementById('presentationVideo');
+    if (!video || !video.muted) {
+        return;
+    }
+    video.muted = false;
+    setPresentationAudioHint(false);
+    video.play().catch(() => {});
+}
+
 async function executeRemoteCommand(command) {
     const payload = command.payload || {};
 
@@ -1216,7 +1268,20 @@ async function executeRemoteCommand(command) {
             video.id = 'presentationVideo';
             video.style.cssText = 'width:100%;height:100%;object-fit:contain';
             video.preload = 'auto';
+            video.playsInline = true;
+            video.setAttribute('playsinline', '');
             overlay.appendChild(video);
+
+            const hint = document.createElement('div');
+            hint.id = 'presentationAudioHint';
+            hint.textContent = 'Tocca lo schermo per attivare l\'audio del video';
+            hint.style.cssText = 'position:absolute;bottom:32px;left:50%;transform:translateX(-50%);padding:12px 22px;border-radius:999px;background:rgba(8,17,31,0.82);color:#f5f8ff;font-family:"Space Grotesk",sans-serif;font-size:18px;letter-spacing:0.02em;box-shadow:0 12px 30px rgba(0,0,0,0.45);display:none';
+            overlay.appendChild(hint);
+
+            // Un tocco/clic sullo schermo studente vale come gesto utente:
+            // riattiva l'audio se la riproduzione era partita in muto.
+            overlay.addEventListener('click', unmutePresentationVideo);
+
             document.body.appendChild(overlay);
         }
         const video = document.getElementById('presentationVideo');
@@ -1226,7 +1291,7 @@ async function executeRemoteCommand(command) {
             video.currentTime = 0;
         }
         overlay.style.display = 'flex';
-        video.play().catch(() => {});
+        playPresentationVideo();
         logEvent('Video presentazione aperto dal tablet del docente.');
         return 'Video aperto sul PC.';
     }
@@ -1238,6 +1303,7 @@ async function executeRemoteCommand(command) {
             if (video) {
                 video.pause();
             }
+            setPresentationAudioHint(false);
             overlay.style.display = 'none';
         }
         if (!document.fullscreenElement) {
@@ -1254,7 +1320,7 @@ async function executeRemoteCommand(command) {
     if (command.type === 'video-play') {
         const video = document.getElementById('presentationVideo');
         if (!video) return 'Nessun video aperto sul PC.';
-        video.play().catch(() => {});
+        playPresentationVideo();
         logEvent('Tablet docente: play video.');
         return 'Video in riproduzione sul PC.';
     }
@@ -1271,7 +1337,7 @@ async function executeRemoteCommand(command) {
         const video = document.getElementById('presentationVideo');
         if (!video) return 'Nessun video aperto sul PC.';
         video.currentTime = 0;
-        video.play().catch(() => {});
+        playPresentationVideo();
         logEvent('Tablet docente: ricomincia video.');
         return 'Video riavviato dall\'inizio sul PC.';
     }
@@ -1885,9 +1951,15 @@ function syncChoices() {
     choiceButtons.forEach((button, index) => {
         const isFocused = index === focusedIndex && ['focus', 'preselect', 'confirm'].includes(currentState);
         const isDimmed = currentState === 'confirm' && selectedIndex !== null && index !== selectedIndex;
-        const isConfirmed = (currentState === 'answered' || currentState === 'done') && answerLockedIndex === index;
-        const isCorrect = (currentState === 'answered' || currentState === 'done') && currentQuestion().correctIndex === index;
-        const isWrong = (currentState === 'answered' || currentState === 'done')
+        const answeredOrDone = currentState === 'answered' || currentState === 'done';
+        const freeChoice = isFreeChoiceQuestion();
+        const isConfirmed = answeredOrDone && answerLockedIndex === index;
+        // Nelle domande a scelta libera evidenziamo come "accettata" la risposta scelta
+        // dallo studente, senza rivelare un'opzione corretta ne segnalare errori.
+        const isCorrect = answeredOrDone && (freeChoice
+            ? answerLockedIndex === index
+            : currentQuestion().correctIndex === index);
+        const isWrong = !freeChoice && answeredOrDone
             && answerLockedIndex === index
             && answerLockedIndex !== currentQuestion().correctIndex;
 
@@ -2153,6 +2225,20 @@ const CORRECT_FEEDBACK_SUBTITLES = [
     'Hai colpito nel segno, sei sulla strada giusta.',
     'Bravo davvero, le tue risposte sono precise.'
 ];
+const ACCEPTED_FEEDBACK_TITLES = [
+    'Risposta registrata!',
+    'Scelta confermata!',
+    'Ottima scelta!',
+    'Bravo, hai scelto!',
+    'Benissimo!'
+];
+const ACCEPTED_FEEDBACK_SUBTITLES = [
+    'La tua scelta e stata registrata, andiamo avanti.',
+    'Hai scelto la tua risposta, continua cosi.',
+    'Bene cosi, passiamo alla prossima.',
+    'Scelta presa con sicurezza, bravo.',
+    'Procediamo, stai andando benissimo.'
+];
 const WRONG_FEEDBACK_TITLES = [
     'Riproviamo!',
     'Non era questa volta',
@@ -2216,13 +2302,21 @@ function spawnFeedbackParticles() {
     }
 }
 
-function showAnswerFeedback(isCorrect) {
-    const title = isCorrect
-        ? pickFeedbackText(CORRECT_FEEDBACK_TITLES)
-        : pickFeedbackText(WRONG_FEEDBACK_TITLES);
-    const subtitle = isCorrect
-        ? pickFeedbackText(CORRECT_FEEDBACK_SUBTITLES)
-        : pickFeedbackText(WRONG_FEEDBACK_SUBTITLES);
+function showAnswerFeedback(outcome) {
+    // outcome: 'correct' | 'wrong' | 'accepted' (scelta libera, sempre positiva)
+    const positive = outcome === 'correct' || outcome === 'accepted';
+    let title;
+    let subtitle;
+    if (outcome === 'accepted') {
+        title = pickFeedbackText(ACCEPTED_FEEDBACK_TITLES);
+        subtitle = pickFeedbackText(ACCEPTED_FEEDBACK_SUBTITLES);
+    } else if (outcome === 'correct') {
+        title = pickFeedbackText(CORRECT_FEEDBACK_TITLES);
+        subtitle = pickFeedbackText(CORRECT_FEEDBACK_SUBTITLES);
+    } else {
+        title = pickFeedbackText(WRONG_FEEDBACK_TITLES);
+        subtitle = pickFeedbackText(WRONG_FEEDBACK_SUBTITLES);
+    }
 
     if (!answerFeedback) {
         return { title, subtitle };
@@ -2231,10 +2325,10 @@ function showAnswerFeedback(isCorrect) {
     window.clearTimeout(feedbackClassTimer);
 
     answerFeedback.classList.remove('answer-feedback--correct', 'answer-feedback--wrong');
-    answerFeedback.classList.add(isCorrect ? 'answer-feedback--correct' : 'answer-feedback--wrong');
+    answerFeedback.classList.add(positive ? 'answer-feedback--correct' : 'answer-feedback--wrong');
 
     if (answerFeedbackBadge) {
-        answerFeedbackBadge.textContent = isCorrect ? '★' : '✨';
+        answerFeedbackBadge.textContent = positive ? '★' : '✨';
     }
     if (answerFeedbackTitle) {
         answerFeedbackTitle.textContent = title;
@@ -2243,7 +2337,7 @@ function showAnswerFeedback(isCorrect) {
         answerFeedbackSubtitle.textContent = subtitle;
     }
 
-    if (isCorrect) {
+    if (positive) {
         spawnFeedbackParticles();
     } else if (answerFeedbackParticles) {
         answerFeedbackParticles.innerHTML = '';
@@ -2257,7 +2351,7 @@ function showAnswerFeedback(isCorrect) {
     if (quizCardStudent) {
         quizCardStudent.classList.remove('is-correct-flash', 'is-wrong-flash');
         void quizCardStudent.offsetWidth;
-        quizCardStudent.classList.add(isCorrect ? 'is-correct-flash' : 'is-wrong-flash');
+        quizCardStudent.classList.add(positive ? 'is-correct-flash' : 'is-wrong-flash');
     }
 
     feedbackHideTimer = window.setTimeout(() => {
@@ -2295,18 +2389,22 @@ function confirmSelection(source) {
     setState('answered');
     setCommandState('Risposta registrata');
 
+    const freeChoice = isFreeChoiceQuestion();
     const isCorrect = answerLockedIndex === currentQuestion().correctIndex;
-    playChime(isCorrect ? 'success' : 'miss');
+    const outcome = freeChoice ? 'accepted' : (isCorrect ? 'correct' : 'wrong');
+    const positive = outcome !== 'wrong';
+    playChime(positive ? 'success' : 'miss');
 
-    const { title, subtitle } = showAnswerFeedback(isCorrect);
+    const { title, subtitle } = showAnswerFeedback(outcome);
     const spokenFeedback = `${title} ${subtitle}`;
 
-    logEvent(`${source}: risposta ${OPTION_LETTERS[answerLockedIndex]} confermata (${isCorrect ? 'corretta' : 'errata'}).`);
+    const esito = freeChoice ? 'scelta registrata' : (isCorrect ? 'corretta' : 'errata');
+    logEvent(`${source}: risposta ${OPTION_LETTERS[answerLockedIndex]} confermata (${esito}).`);
     window.setTimeout(() => {
         speakText(spokenFeedback, {
             interrupt: true,
             rate: 1.0,
-            pitch: isCorrect ? 1.08 : 0.97
+            pitch: positive ? 1.08 : 0.97
         });
     }, 320);
 

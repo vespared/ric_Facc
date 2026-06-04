@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "title": "La propaganda nei totalitarismi",
+    "prompt": "In che senso la propaganda dei regimi totalitari può essere definita un \"gossip di Stato\"?",
+    "options": [
+      "Perché serviva a raccontare la verità su ciò che accadeva nel mondo.",
+      "Perché era un'informazione manipolata per controllare le masse e colpire i \"nemici\"."
+    ],
+    "correctIndex": 1
+  }
+]

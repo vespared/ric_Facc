@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "title": "Il Fair Play",
+    "prompt": "Cosa impariamo nel calcio grazie al Fair Play?",
+    "options": [
+      "A fare squadra con tutti.",
+      "A giocare da soli."
+    ],
+    "correctIndex": 0
+  }
+]

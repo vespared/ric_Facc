@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "title": "La Pop Art di Andy Warhol",
+    "prompt": "Qual è l'effetto della Pop Art di Warhol sulle persone famose?",
+    "options": [
+      "Le trasforma in \"icone\" consumate dai media.",
+      "Le protegge da ogni pettegolezzo."
+    ],
+    "correctIndex": 0
+  }
+]

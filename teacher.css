@@ -171,6 +171,17 @@
     font-size: 0.9rem;
 }
 
+.teacher-presentation-note {
+    color: var(--muted);
+    font-size: 0.92rem;
+    line-height: 1.5;
+    margin-bottom: 14px;
+}
+
+.teacher-presentation-note strong {
+    color: var(--text);
+}
+
 .teacher-field input,
 .teacher-field textarea,
 .teacher-field select {

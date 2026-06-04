@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "title": "Il diritto alla privacy",
+    "prompt": "Secondo il testo, quale condizione fondamentale è stata tolta alla Monaca di Monza e deve invece essere garantita a tutti?",
+    "options": [
+      "La dignità.",
+      "La libertà."
+    ],
+    "correctIndex": 1
+  }
+]
