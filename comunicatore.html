@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comunicatore | Ric_Facc</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Oswald:wght@500;600;700&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="comunicatore.css">
+</head>
+
+<body>
+    <!-- SCHERMATA DI AVVIO: partenza dedicata e separata dal sistema esame. -->
+    <div id="commStart" class="comm-start">
+        <div class="comm-start__card">
+            <div class="comm-start__badge" aria-hidden="true">
+                <span class="comm-badge__stars">&#9733; &#9733;</span>
+                <span class="comm-badge__forza">FORZA</span>
+                <span class="comm-badge__inter">INTER</span>
+            </div>
+            <h1 class="comm-start__title">Comunicatore</h1>
+            <p class="comm-start__subtitle">Scrivi e parla muovendo solo il viso.</p>
+            <ul class="comm-start__hints">
+                <li><strong>Apri la bocca</strong> per scorrere i riquadri</li>
+                <li><strong>Chiudi gli occhi</strong> (circa 1 secondo) per scegliere</li>
+            </ul>
+            <button id="commStartBtn" class="comm-start__btn" type="button">&#9654; Avvia comunicatore</button>
+            <p id="commStartStatus" class="comm-start__status">Serve la webcam. Concedi il permesso quando richiesto.</p>
+        </div>
+    </div>
+
+    <!-- COMUNICATORE -->
+    <div id="communicator" class="communicator" role="application" aria-label="Comunicatore alfabetico">
+        <div class="comm-board">
+            <div class="comm-badge" aria-hidden="true">
+                <span class="comm-badge__stars">&#9733; &#9733;</span>
+                <span class="comm-badge__forza">FORZA</span>
+                <span class="comm-badge__inter">INTER</span>
+            </div>
+            <div class="comm-board__divider" aria-hidden="true"></div>
+            <div class="comm-phrase-wrap">
+                <span id="commPhrasePh" class="comm-phrase-ph">Scegli un gruppo, poi una lettera&hellip;</span>
+                <span id="commPhraseText" class="comm-phrase-text"></span>
+                <span class="comm-caret" aria-hidden="true"></span>
+            </div>
+            <div class="comm-board__controls">
+                <span class="comm-hint" id="commHint">Bocca: scorri &middot; Occhi chiusi: scegli</span>
+                <button id="commAudioBtn" class="comm-ctrl-btn comm-audio" type="button">AUDIO ON</button>
+                <button id="commExitBtn" class="comm-ctrl-btn comm-exit" type="button">CHIUDI &#10005;</button>
+            </div>
+        </div>
+        <div class="comm-stage">
+            <div id="commGroups" class="comm-groups"></div>
+            <div id="commPanels" class="comm-panels"></div>
+        </div>
+
+        <!-- HUD: auto-inquadratura + stato comandi -->
+        <div class="comm-hud" id="commHud">
+            <video class="comm-hud__video" autoplay playsinline muted></video>
+            <div class="comm-hud__meta">
+                <span id="commHudState" class="comm-hud__state">In attesa</span>
+                <span class="comm-hud__metrics">EAR <strong id="commHudEar">0.000</strong> &middot; MAR <strong id="commHudMar">0.000</strong></span>
+            </div>
+        </div>
+    </div>
+
+    <script src="comunicatore.js"></script>
+</body>
+
+</html>
