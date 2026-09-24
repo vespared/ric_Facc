@@ -145,7 +145,8 @@ Dettagli completi in [`INSTALLAZIONE_WINDOWS.md`](INSTALLAZIONE_WINDOWS.md).
 
 - **`avvia-ric-facc.cmd`** (o il collegamento `Ric_Facc` sul Desktop): avvia il server e apre la
   pagina studente **a schermo intero in modalità kiosk** (Edge). Per chiudere: `Alt+F4`.
-- **`avvia-server-rete.cmd`**: avvia solo il server e mostra gli indirizzi LAN per il tablet docente.
+- **`avvia-server-rete.cmd`**: avvia il server in rete locale e apre automaticamente un **riquadro grafico dedicato con il QR Code** per far inquadrare e collegare il docente con cellulare o tablet. **Appena il docente inquadra il QR Code, la pagina studente (`http://localhost:3000/`) si apre automaticamente nel browser del PC**.
+- **`apri-qr.cmd`**: apre in qualsiasi momento la finestra grafica con il QR code docente.
 
 ### Avvio manuale (qualsiasi sistema)
 
@@ -171,9 +172,7 @@ Con il server attivo:
 | Debug studente | `http://localhost:3000/debug.html` | Strumenti di diagnosi del tracking. |
 | Manuale | `http://localhost:3000/manuale.html` | Guida d'uso illustrata. |
 
-**Flusso d'esame tipico:** il docente apre `teacher.html` sul tablet → *Inizia esame* (lo studente
-esce dalla schermata d'attesa e parte la prima diapositiva) → pubblica le domande della materia →
-lo studente risponde con bocca/occhi → al termine *Fine esame* mostra i ringraziamenti finali sul PC.
+**Flusso d'esame (modalità solo domande):** lo studente accede direttamente al quiz (subito pronto con le domande attive, senza schermate d'attesa o diapositive) → il docente gestisce le domande dal pannello `teacher.html` (selezione materia dalla banca domande, lettura domanda, comandi remoti e inserimento nuove domande live) → lo studente risponde tramite riconoscimento facciale (bocca/occhi) o comandi remoti del docente.
 
 ---
 

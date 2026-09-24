@@ -12,27 +12,31 @@ if errorlevel 1 (
     exit /b 1
 )
 
-netstat -ano | findstr /R /C:":3000 .*LISTENING" >nul
+if not defined PORT set "PORT=3000"
+set "AUTO_OPEN_STUDENT=1"
+
+netstat -ano | findstr /R /C:":%PORT% .*LISTENING" >nul
 if not errorlevel 1 (
     echo.
-    echo La porta 3000 e gia occupata.
-    echo Probabilmente il server e gia attivo in un altra finestra.
+    echo Il server e' gia' attivo sulla porta %PORT% in un'altra finestra.
+    echo Apertura del riquadro grafico con il QR code per il docente...
     echo.
-    echo Se sei sulla stessa rete Wi-Fi del PC, prova ad aprire:
-    for /f "tokens=2 delims=:" %%A in ('ipconfig ^| findstr /C:"Indirizzo IPv4"') do (
-        set IP=%%A
-        set IP=!IP: =!
-        if "!IP!" neq "" echo - http://!IP!:3000/
-    )
-    echo.
-    echo Usa l indirizzo del Wi-Fi del PC.
-    echo Ignora eventuali IP di VPN o adattatori virtuali.
-    echo.
-    echo Se la pagina non si apre dal telefono, controlla firewall o VPN.
-    echo.
-    pause
-    exit /b 1
+    start "" powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%~dp0apri-qr.ps1" -Port %PORT%
+    timeout /t 2 >nul
+    exit /b 0
 )
+
+echo.
+echo ============================================================
+echo   Ric_Facc - Server Locale per Docente e Studente
+echo   Porta: %PORT%
+echo   Appena il docente inquadra il QR code con smartphone/tablet,
+echo   la pagina studente verra' aperta direttamente su questo PC.
+echo ============================================================
+echo.
+
+rem --- Avvia in background il riquadro grafico con il QR code docente appena il server e' pronto ---
+start "" powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%~dp0apri-qr.ps1" -Port %PORT%
 
 node server.js
 pause

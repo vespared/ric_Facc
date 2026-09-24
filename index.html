@@ -24,37 +24,7 @@
 </head>
 
 <body>
-    <div class="license-splash" id="licenseSplash" role="dialog" aria-label="Avviso di licenza">
-        <div class="license-splash__backdrop" aria-hidden="true"></div>
-        <div class="license-splash__card">
-            <div class="license-splash__mark">©</div>
-            <p class="license-splash__year">2026 &middot; Dott. Carlo Santoro</p>
-            <h2 class="license-splash__title">Tutti i diritti riservati</h2>
-            <p class="license-splash__body">
-                Il presente software &egrave; propriet&agrave; intellettuale esclusiva del titolare.
-                Uso concesso in licenza limitata alla <strong>Famiglia Martinelli</strong>,
-                in conformit&agrave; e nei limiti delle vigenti concessioni d'uso.
-            </p>
-            <div class="license-splash__progress" aria-hidden="true">
-                <span class="license-splash__progress-bar"></span>
-            </div>
-        </div>
-    </div>
 
-    <div class="exam-gate" id="examGate" role="status" aria-label="In attesa dell'inizio dell'esame">
-        <div class="exam-gate__backdrop" aria-hidden="true"></div>
-        <div class="exam-gate__card">
-            <div class="exam-gate__pulse" aria-hidden="true">
-                <span></span><span></span><span></span>
-            </div>
-            <p class="exam-gate__eyebrow">Sessione d'esame</p>
-            <h2 class="exam-gate__title">In attesa dell'inizio dell'esame</h2>
-            <p class="exam-gate__body">
-                Il professore avvier&agrave; l'esame a breve.<br>
-                Rimani in posizione e mantieni la calma: comparir&agrave; la prima domanda non appena la commissione dar&agrave; il via.
-            </p>
-        </div>
-    </div>
 
     <div class="app-shell app-shell--student">
         <main class="main-grid main-grid--quiz">
@@ -272,19 +242,6 @@
     </div>
 
     <script src="app.js"></script>
-    <script>
-        (function () {
-            var splash = document.getElementById('licenseSplash');
-            if (!splash) return;
-            var DURATION = 10000;
-            setTimeout(function () {
-                splash.classList.add('license-splash--closing');
-                setTimeout(function () {
-                    if (splash.parentNode) splash.parentNode.removeChild(splash);
-                }, 600);
-            }, DURATION);
-        })();
-    </script>
 </body>
 
 </html>

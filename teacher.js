@@ -22,8 +22,6 @@ const teacherLeftEar = document.getElementById('teacherLeftEar');
 const teacherRightEar = document.getElementById('teacherRightEar');
 const teacherAverageEar = document.getElementById('teacherAverageEar');
 const teacherMar = document.getElementById('teacherMar');
-
-const teacherStartExamBtn = document.getElementById('teacherStartExamBtn');
 const teacherStartCameraBtn = document.getElementById('teacherStartCameraBtn');
 const teacherReadQuestionBtn = document.getElementById('teacherReadQuestionBtn');
 const teacherScrollBtn = document.getElementById('teacherScrollBtn');
@@ -32,7 +30,6 @@ const teacherConfirmBtn = document.getElementById('teacherConfirmBtn');
 const teacherRepeatQuestionBtn = document.getElementById('teacherRepeatQuestionBtn');
 const teacherNextQuestionBtn = document.getElementById('teacherNextQuestionBtn');
 const teacherResetBtn = document.getElementById('teacherResetBtn');
-const teacherFinishExamBtn = document.getElementById('teacherFinishExamBtn');
 const teacherFramingBtn = document.getElementById('teacherFramingBtn');
 const teacherFramingCard = document.getElementById('teacherFramingCard');
 const teacherFramingStatus = document.getElementById('teacherFramingStatus');
@@ -52,32 +49,6 @@ const framingBadgeMouth = document.getElementById('framingBadgeMouth');
 const FRAMING_SCENE_WIDTH = 200;
 const FRAMING_SCENE_HEIGHT = 150;
 let framingVisible = false;
-// Diapositive di presentazione: le immagini nella cartella /presentazione, in ordine.
-// La prima (indice 0) viene mostrata automaticamente all'avvio dell'esame.
-const PRESENTATION_SLIDES = [
-    { file: '1_FRONTESPIZIO.png', label: 'Frontespizio' },
-    { file: '2_INTRODUZIONE.png', label: 'Introduzione' },
-    { file: '3_ITALIANO.png', label: 'Italiano' },
-    { file: '4_STORIA.png', label: 'Storia' },
-    { file: '5_GEOGRAFIA.png', label: 'Geografia' },
-    { file: '6_TECNOLOGIA.png', label: 'Tecnologia' },
-    { file: '7_MUSICA.png', label: 'Musica' },
-    { file: '8_ARTE.png', label: 'Arte' },
-    { file: '9_SCIENZA.png', label: 'Scienza' },
-    { file: '10_EDUCAZ_CIVICA.png', label: 'Educazione civica' },
-    { file: '11_EDUCAZIONE_FISICA.png', label: 'Educazione fisica' },
-    { file: '12_INGLESE.png', label: 'Inglese' },
-    { file: '13_FRANCESE.png', label: 'Francese' },
-    { file: '14_RELIGIONE.png', label: 'Religione' },
-    { file: '15_CONCLUSIONI.png', label: 'Conclusioni' }
-];
-const teacherPresentationStatus = document.getElementById('teacherPresentationStatus');
-const teacherSlideSelect = document.getElementById('teacherSlideSelect');
-const teacherSlidePrevBtn = document.getElementById('teacherSlidePrevBtn');
-const teacherSlideNextBtn = document.getElementById('teacherSlideNextBtn');
-const teacherShowSlideBtn = document.getElementById('teacherShowSlideBtn');
-const teacherCloseSlideBtn = document.getElementById('teacherCloseSlideBtn');
-let currentSlideIndex = 0;
 
 const teacherPublishNowBtn = document.getElementById('teacherPublishNowBtn');
 const teacherQueueNextBtn = document.getElementById('teacherQueueNextBtn');
@@ -95,8 +66,6 @@ let lastSentCommandId = 0;
 
 function getCommandLabel(type) {
     switch (type) {
-        case 'start-exam':
-            return 'Inizia esame';
         case 'start-camera':
             return 'Avvia webcam';
         case 'read-question':
@@ -117,16 +86,10 @@ function getCommandLabel(type) {
             return 'Pubblica file subito';
         case 'queue-batch':
             return 'Aggiungi file in coda';
-        case 'show-slide':
-            return 'Mostra diapositiva';
-        case 'close-slide':
-            return 'Chiudi diapositiva';
         case 'repeat-question':
             return 'Ripeti domanda';
         case 'next-question':
             return 'Domanda successiva';
-        case 'finish-exam':
-            return 'Termina esame';
         default:
             return type || 'Comando remoto';
     }
@@ -700,14 +663,6 @@ async function sendQuestionCommand(commandType) {
     }
 }
 
-if (teacherStartExamBtn) {
-    teacherStartExamBtn.addEventListener('click', () => {
-        // Avvia l'esame e subito dopo mostra la prima diapositiva sul PC.
-        void sendCommand('start-exam').then(() => {
-            showSlideAt(0);
-        });
-    });
-}
 
 teacherStartCameraBtn.addEventListener('click', () => {
     void sendCommand('start-camera');
@@ -745,14 +700,6 @@ teacherResetBtn.addEventListener('click', () => {
     void sendCommand('reset-flow');
 });
 
-if (teacherFinishExamBtn) {
-    teacherFinishExamBtn.addEventListener('click', () => {
-        const conferma = window.confirm("Terminare l'esame e mostrare i saluti e i ringraziamenti finali sul PC dello studente?");
-        if (conferma) {
-            void finishExam();
-        }
-    });
-}
 
 if (teacherFramingBtn) {
     teacherFramingBtn.addEventListener('click', () => {
@@ -760,67 +707,6 @@ if (teacherFramingBtn) {
     });
 }
 
-// Popola il menu a tendina con le diapositive disponibili.
-function populateSlideSelect() {
-    if (!teacherSlideSelect) return;
-    teacherSlideSelect.innerHTML = PRESENTATION_SLIDES.map((slide, index) =>
-        `<option value="${index}">${index + 1} &middot; ${escapeHtml(slide.label)}</option>`
-    ).join('');
-    teacherSlideSelect.value = String(currentSlideIndex);
-}
-
-function getCurrentSlide() {
-    return PRESENTATION_SLIDES[currentSlideIndex] || PRESENTATION_SLIDES[0];
-}
-
-// Mostra la diapositiva all'indice indicato sul PC dello studente.
-function showSlideAt(index) {
-    if (index < 0 || index >= PRESENTATION_SLIDES.length) return;
-    currentSlideIndex = index;
-    if (teacherSlideSelect) teacherSlideSelect.value = String(currentSlideIndex);
-    const slide = getCurrentSlide();
-    const url = '/presentazione/' + slide.file;
-    const label = `${currentSlideIndex + 1} - ${slide.label}`;
-    if (teacherPresentationStatus) teacherPresentationStatus.textContent = `Invio diapositiva ${label}...`;
-    void sendCommand('show-slide', { url, label }).then(() => {
-        if (teacherPresentationStatus) teacherPresentationStatus.textContent = `Diapositiva ${label} mostrata sul PC.`;
-    });
-}
-
-populateSlideSelect();
-
-if (teacherSlideSelect) {
-    teacherSlideSelect.addEventListener('change', () => {
-        currentSlideIndex = Number(teacherSlideSelect.value) || 0;
-    });
-}
-
-if (teacherShowSlideBtn) {
-    teacherShowSlideBtn.addEventListener('click', () => {
-        showSlideAt(Number(teacherSlideSelect && teacherSlideSelect.value) || 0);
-    });
-}
-
-if (teacherSlidePrevBtn) {
-    teacherSlidePrevBtn.addEventListener('click', () => {
-        showSlideAt(Math.max(0, currentSlideIndex - 1));
-    });
-}
-
-if (teacherSlideNextBtn) {
-    teacherSlideNextBtn.addEventListener('click', () => {
-        showSlideAt(Math.min(PRESENTATION_SLIDES.length - 1, currentSlideIndex + 1));
-    });
-}
-
-if (teacherCloseSlideBtn) {
-    teacherCloseSlideBtn.addEventListener('click', () => {
-        if (teacherPresentationStatus) teacherPresentationStatus.textContent = 'Chiusura in corso...';
-        void sendCommand('close-slide').then(() => {
-            if (teacherPresentationStatus) teacherPresentationStatus.textContent = 'Diapositiva chiusa.';
-        });
-    });
-}
 
 teacherPublishNowBtn.addEventListener('click', () => {
     void sendQuestionCommand('publish-now');
@@ -936,7 +822,6 @@ const completedExamSubjects = new Set();
 let currentExamSubject = { subject: DEFAULT_SUBJECT, label: DEFAULT_SUBJECT };
 let prevSimulationCompleted = false;
 let examFlowInitialized = false;
-let examFinished = false;
 
 async function probeExamPlan() {
     const buttons = [...document.querySelectorAll('.subject-btn')];
@@ -965,7 +850,6 @@ function hideExamFlowPanel() {
 
 function markSubjectStarted(subjectKey, subjectLabel) {
     currentExamSubject = subjectKey ? { subject: subjectKey, label: subjectLabel || subjectKey } : null;
-    examFinished = false;
     hideExamFlowPanel();
 }
 
@@ -1039,10 +923,12 @@ function renderSubjectDonePanel() {
 function renderAllDonePanel() {
     showExamFlowPanel(
         'Tutte le materie completate',
-        "Lo studente ha completato tutte le materie dell'esame. L'esame e finito oppure vuoi inserire una domanda al momento?"
+        "Lo studente ha completato tutte le materie disponibili. Vuoi selezionare una materia dalla banca domande o inserire una nuova domanda?"
     );
-    addExamFlowButton("Termina l'esame", 'primary', () => {
-        void finishExam();
+    addExamFlowButton('Scegli una materia', 'primary', () => {
+        hideExamFlowPanel();
+        const card = document.querySelector('.teacher-subjects-card');
+        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
     addExamFlowButton('Inserisci una domanda', 'secondary', () => {
         hideExamFlowPanel();
@@ -1050,19 +936,6 @@ function renderAllDonePanel() {
         if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
         if (teacherQuestionPromptInput) teacherQuestionPromptInput.focus();
     });
-}
-
-async function finishExam() {
-    try {
-        await sendCommand('finish-exam');
-        examFinished = true;
-        showExamFlowPanel(
-            'Esame concluso',
-            'Esame concluso. Grazie alla commissione e complimenti a Giuseppe per il grande impegno: i ringraziamenti sono mostrati sul PC dello studente.'
-        );
-    } catch (error) {
-        setActionStatus(`Errore chiusura esame: ${error.message}`, true);
-    }
 }
 
 function handleSubjectCompleted() {
@@ -1092,7 +965,7 @@ function processExamFlow(snapshot) {
         examFlowInitialized = true;
         return;
     }
-    if (completedNow && !prevSimulationCompleted && !examFinished) {
+    if (completedNow && !prevSimulationCompleted) {
         handleSubjectCompleted();
     }
     prevSimulationCompleted = completedNow;

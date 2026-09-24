@@ -1,4 +1,4 @@
-﻿const CONFIG = {
+const CONFIG = {
     earThreshold: 0.13,
     marThreshold: 0.17,
     glassesMode: true,
@@ -108,7 +108,7 @@ let confirmProgress = 0;
 let confirmProgressMode = 'confirm';
 let confirmCancelEnabled = false;
 let simulationCompleted = false;
-let examStarted = false;
+let examStarted = true;
 let nextQuestionTimer = null;
 let manualLock = false;
 let demoRunning = false;
@@ -1075,12 +1075,6 @@ function publishQuestionBatchNow(rawQuestions, source = 'Tablet docente') {
         throw new Error('Nessuna domanda trovata nel file importato.');
     }
 
-    // Se lo studente sta guardando una diapositiva di presentazione, la chiude
-    // e torna alla domanda appena pubblicata.
-    if (hideSlideOverlay()) {
-        logEvent(`${source}: chiusa la diapositiva per mostrare la nuova domanda.`);
-    }
-
     // "Pubblica subito" una materia intera SOSTITUISCE il quiz attivo con le sole
     // domande del file: cosi il conteggio coincide sempre con il file caricato e non
     // si sommano eventuali domande gia presenti (es. la materia caricata di default).
@@ -1131,40 +1125,6 @@ function queueQuestionBatchAsNext(rawQuestions, source = 'Tablet docente') {
         rate: 1.02,
         pitch: 1.04
     });
-}
-
-// Crea (se serve) e mostra l'overlay a schermo intero con la diapositiva
-// indicata dal docente. Ogni diapositiva e' un'immagine della cartella /presentazione.
-function showSlideOverlay(url) {
-    let overlay = document.getElementById('slideOverlay');
-    if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.id = 'slideOverlay';
-        overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#000;display:flex;align-items:center;justify-content:center';
-        const img = document.createElement('img');
-        img.id = 'slideImage';
-        img.alt = 'Diapositiva di presentazione';
-        img.style.cssText = 'max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain';
-        overlay.appendChild(img);
-        document.body.appendChild(overlay);
-    }
-    const img = document.getElementById('slideImage');
-    if (img.getAttribute('src') !== url) {
-        img.src = url;
-    }
-    overlay.style.display = 'flex';
-}
-
-// Chiude l'overlay della diapositiva (se aperto), per tornare alla
-// visualizzazione della domanda. Restituisce true se era effettivamente aperto.
-function hideSlideOverlay() {
-    const overlay = document.getElementById('slideOverlay');
-    if (!overlay || overlay.style.display === 'none') {
-        return false;
-    }
-    overlay.style.display = 'none';
-    cameraWasRunningBeforePresentation = false;
-    return true;
 }
 
 async function executeRemoteCommand(command) {
@@ -1253,40 +1213,6 @@ async function executeRemoteCommand(command) {
         return 'File di domande aggiunto in coda sul PC.';
     }
 
-    if (command.type === 'show-slide') {
-        const url = String(payload.url || '').trim();
-        if (!url || (!/^https?:\/\//i.test(url) && !url.startsWith('/'))) {
-            return 'Percorso o URL diapositiva non valido.';
-        }
-        // La prima diapositiva aperta spegne la webcam, cosi resta libero lo
-        // schermo; verra' riattivata alla chiusura se era in funzione.
-        const overlayWasOpen = !!document.getElementById('slideOverlay')
-            && document.getElementById('slideOverlay').style.display !== 'none';
-        if (!overlayWasOpen) {
-            cameraWasRunningBeforePresentation = isRunning;
-            if (isRunning) {
-                await stopCamera();
-            }
-        }
-        showSlideOverlay(url);
-        const label = String(payload.label || '').trim();
-        logEvent(`Diapositiva mostrata dal tablet del docente${label ? `: ${label}` : ''}.`);
-        return `Diapositiva mostrata sul PC${label ? ` (${label})` : ''}.`;
-    }
-
-    if (command.type === 'close-slide') {
-        hideSlideOverlay();
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(() => {});
-        }
-        logEvent('Diapositiva chiusa dal tablet del docente.');
-        if (cameraWasRunningBeforePresentation) {
-            cameraWasRunningBeforePresentation = false;
-            await startCamera();
-        }
-        return 'Diapositiva chiusa sul PC.';
-    }
-
     if (command.type === 'next-question') {
         ensureAudioContext();
         if (simulationCompleted) {
@@ -1310,59 +1236,21 @@ async function executeRemoteCommand(command) {
         return 'Domanda ripetuta sul PC.';
     }
 
-    if (command.type === 'finish-exam') {
-        showExamThankYou();
-        return 'Esame concluso: ringraziamenti mostrati sul PC.';
-    }
-
     return 'Comando remoto ricevuto.';
 }
 
 function hideExamGate() {
     const gate = document.getElementById('examGate');
-    if (!gate) {
-        return;
+    if (gate && gate.parentNode) {
+        gate.parentNode.removeChild(gate);
     }
-    gate.classList.add('exam-gate--hidden');
-    window.setTimeout(() => {
-        if (gate.parentNode) {
-            gate.parentNode.removeChild(gate);
-        }
-    }, 600);
 }
 
 function startExam() {
-    if (examStarted) {
-        logEvent("Tablet docente: comando inizio esame ignorato (esame gia avviato).");
-        return;
-    }
     examStarted = true;
     hideExamGate();
     resetCurrentFlow(true);
-    setCommandState('Esame avviato');
-    logEvent("Tablet docente: l'esame ha inizio.");
-    speakText("L'esame ha inizio.", { interrupt: true, rate: 1.02, pitch: 1.04 });
-}
-
-function showExamThankYou() {
-    simulationCompleted = true;
-    let overlay = document.getElementById('examThankYouOverlay');
-    if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.id = 'examThankYouOverlay';
-        overlay.className = 'exam-thankyou-overlay';
-        overlay.innerHTML = `
-            <img class="exam-thankyou-image" src="finale.png" alt="Esame concluso. Grazie alla commissione e complimenti a Giuseppe per il grande impegno.">`;
-        document.body.appendChild(overlay);
-    }
-    overlay.style.display = 'flex';
-    setState('done');
-    setCommandState('Esame concluso');
-    logEvent('Esame concluso: ringraziamenti mostrati sul PC.');
-    speakText(
-        "L'esame e concluso. Grazie alla commissione per la presenza. Un grande complimento a Giuseppe per il grande impegno dimostrato durante tutto l'esame.",
-        { interrupt: true, rate: 1.0, pitch: 1.05 }
-    );
+    setCommandState('In attesa');
 }
 
 async function pollRemoteCommands() {
@@ -2698,7 +2586,7 @@ async function stopCamera() {
     startBtn.disabled = false;
     startBtn.textContent = 'Avvia webcam';
     loadingOverlay.classList.remove('active');
-    logEvent('Webcam disattivata per la modalita presentazione.');
+    logEvent('Webcam disattivata.');
 }
 
 function sleep(ms) {
@@ -2885,13 +2773,8 @@ setCommandState('In attesa');
 startRemoteSync();
 void loadDefaultSubjectQuestions();
 
-// Senza server (apertura come file locale) non c'e' un docente che invii
-// l'inizio esame: in tal caso si avvia direttamente, evitando il blocco sul gate.
-if (!REMOTE_SYNC_ENABLED) {
-    startExam();
-} else {
-    setCommandState("In attesa dell'inizio dell'esame");
-}
+examStarted = true;
+setCommandState('In attesa');
 
 async function loadDefaultSubjectQuestions() {
     try {

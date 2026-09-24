@@ -171,42 +171,6 @@
     font-size: 0.9rem;
 }
 
-.teacher-presentation-note {
-    color: var(--muted);
-    font-size: 0.92rem;
-    line-height: 1.5;
-    margin-bottom: 14px;
-}
-
-.teacher-presentation-note strong {
-    color: var(--text);
-}
-
-.teacher-slide-controls {
-    margin-bottom: 14px;
-}
-
-.teacher-slide-label {
-    display: block;
-    color: var(--muted);
-    font-size: 0.85rem;
-    margin-bottom: 6px;
-}
-
-.teacher-slide-select {
-    width: 100%;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 16px;
-    padding: 14px 16px;
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--text);
-    outline: none;
-}
-
-.teacher-slide-select:focus {
-    border-color: rgba(45, 226, 230, 0.7);
-    box-shadow: 0 0 0 3px rgba(45, 226, 230, 0.14);
-}
 
 .teacher-field input,
 .teacher-field textarea,

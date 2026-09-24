@@ -5,7 +5,8 @@ Questo progetto puo essere avviato su un PC Windows anche se Node.js non e ancor
 ## File da usare
 
 - `installa-ric-facc.cmd`: prima installazione completa
-- `avvia-ric-facc.cmd`: avvii successivi del progetto
+- `avvia-ric-facc.cmd`: avvii successivi del progetto (modalita kiosk)
+- `avvia-server-rete.cmd`: avvio in rete con QR Code per il docente (apre automaticamente il browser studente all'acquisizione del QR code)
 
 ## Prima installazione
 
