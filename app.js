@@ -19,23 +19,226 @@ let EAR_THRESHOLD = CONFIG.earThreshold;
 let MAR_THRESHOLD = CONFIG.marThreshold;
 let isGlassesMode = CONFIG.glassesMode;
 
-const DEFAULT_SUBJECT = 'Italiano';
-
 const DEFAULT_QUESTION_SET = [
     {
-        title: 'Manzoni e la lingua de I Promessi Sposi',
-        prompt: 'Perché Manzoni scelse una lingua semplice e quale modello usò?',
+        title: 'Domanda 1 (4 scelte)',
+        prompt: 'Quale pianeta del nostro sistema solare e conosciuto come il Pianeta Rosso?',
         options: [
-            'Voleva usare il latino per rivolgersi solo ai nobili e ai dotti.',
-            "Voleva il fiorentino parlato dai colti per unificare l'Italia.",
-            'Voleva scrivere in dialetto milanese perché era più spontaneo.',
-            'Voleva creare una lingua complicata per dimostrare la sua bravura.'
+            'Marte',
+            'Giove',
+            'Venere',
+            'Nettuno'
         ],
-        correctIndex: 1
+        correctIndex: 0
+    },
+    {
+        title: 'Domanda 2 (3 scelte)',
+        prompt: 'Quale fra questi e uno stato fisico fondamentale della materia?',
+        options: [
+            'Solido',
+            'Elettrico',
+            'Magnetico'
+        ],
+        correctIndex: 0
+    },
+    {
+        title: 'Domanda 3 (2 scelte)',
+        prompt: 'Il Sole e una stella situata al centro del nostro sistema planetario?',
+        options: [
+            'Vero',
+            'Falso'
+        ],
+        correctIndex: 0
     }
 ];
 
 let questionSet = cloneQuestionSet(DEFAULT_QUESTION_SET);
+
+let currentQuizSession = {
+    id: `quiz_${Date.now()}`,
+    student: 'Martinelli',
+    subject: 'Italiano',
+    startedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    status: 'in_corso',
+    answers: [],
+    score: { esatte: 0, errate: 0, libere: 0, totaleRisposte: 0, percentuale: 0 },
+    fileName: null
+};
+
+function recalculateSessionScore() {
+    let esatte = 0;
+    let errate = 0;
+    let libere = 0;
+    const answered = currentQuizSession.answers.filter(Boolean);
+    answered.forEach((a) => {
+        if (a.outcome === 'correct' || a.isCorrect === true) {
+            esatte++;
+        } else if (a.outcome === 'wrong' || a.isCorrect === false) {
+            errate++;
+        } else {
+            libere++;
+        }
+    });
+    const totaleRisposte = answered.length;
+    const totaleDomande = questionSet.length || 1;
+    const percentuale = Math.round((esatte / totaleDomande) * 100);
+    currentQuizSession.score = {
+        esatte,
+        errate,
+        libere,
+        totaleRisposte,
+        percentuale
+    };
+    return currentQuizSession.score;
+}
+
+function initQuizSession(subject, questions) {
+    currentQuizSession.id = `quiz_${Date.now()}`;
+    currentQuizSession.subject = subject || currentQuizSession.subject || 'Italiano';
+    currentQuizSession.startedAt = new Date().toISOString();
+    currentQuizSession.updatedAt = new Date().toISOString();
+    currentQuizSession.answers = [];
+    currentQuizSession.fileName = null;
+    currentQuizSession.status = 'in_corso';
+    recalculateSessionScore();
+}
+
+async function savePartialQuizSession() {
+    if (!currentQuizSession.startedAt) {
+        currentQuizSession.startedAt = new Date().toISOString();
+    }
+    currentQuizSession.updatedAt = new Date().toISOString();
+
+    const payload = {
+        id: currentQuizSession.id,
+        student: currentQuizSession.student,
+        subject: currentQuizSession.subject,
+        startedAt: currentQuizSession.startedAt,
+        fileName: currentQuizSession.fileName,
+        currentQuestionIndex: currentQuestionIndex,
+        totaleDomande: questionSet.length,
+        domandeCompletate: currentQuizSession.answers.filter(Boolean).length,
+        score: currentQuizSession.score,
+        questions: questionSet,
+        answers: currentQuizSession.answers
+    };
+
+    try {
+        const res = await fetchJson('/api/quiz/save-partial', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+        if (res && res.session) {
+            currentQuizSession.id = res.session.id;
+            currentQuizSession.fileName = res.session.fileName;
+        }
+    } catch (e) {
+        try {
+            localStorage.setItem('ric_facc_partial_quiz', JSON.stringify(payload));
+        } catch (err) {}
+    }
+}
+
+async function saveTotalQuizSession() {
+    currentQuizSession.status = 'completato';
+    currentQuizSession.updatedAt = new Date().toISOString();
+
+    const payload = {
+        id: currentQuizSession.id,
+        student: currentQuizSession.student,
+        subject: currentQuizSession.subject,
+        startedAt: currentQuizSession.startedAt,
+        fileName: currentQuizSession.fileName,
+        currentQuestionIndex: questionSet.length,
+        totaleDomande: questionSet.length,
+        domandeCompletate: currentQuizSession.answers.filter(Boolean).length,
+        score: currentQuizSession.score,
+        questions: questionSet,
+        answers: currentQuizSession.answers
+    };
+
+    try {
+        const res = await fetchJson('/api/quiz/save-total', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+        if (res && res.session) {
+            currentQuizSession.fileName = res.session.fileName;
+            currentQuizSession.schedaReport = res.session.schedaReport;
+            logEvent(`Risultato totale salvato per ${currentQuizSession.student}: ${res.session.fileName}`);
+        }
+        try {
+            localStorage.removeItem('ric_facc_partial_quiz');
+        } catch (err) {}
+    } catch (e) {
+        console.error('Errore salvataggio totale:', e);
+    }
+}
+
+function resumeQuizSession(session) {
+    if (!session || !Array.isArray(session.domande) || session.domande.length === 0) {
+        return;
+    }
+    questionSet = cloneQuestionSet(session.domande);
+    currentQuizSession.id = session.id;
+    currentQuizSession.student = session.studente || currentQuizSession.student;
+    currentQuizSession.subject = session.materia || currentQuizSession.subject;
+    currentQuizSession.startedAt = session.dataIso || new Date().toISOString();
+    currentQuizSession.answers = Array.isArray(session.answers) ? [...session.answers] : [];
+    currentQuizSession.fileName = session.fileName;
+    currentQuizSession.status = 'in_corso';
+
+    let targetIndex = Number(session.currentQuestionIndex || 0);
+    if (currentQuizSession.answers[targetIndex] && targetIndex < questionSet.length - 1) {
+        const nextUnanswered = questionSet.findIndex((_, idx) => !currentQuizSession.answers[idx]);
+        if (nextUnanswered >= 0) {
+            targetIndex = nextUnanswered;
+        }
+    }
+    targetIndex = Math.max(0, Math.min(targetIndex, questionSet.length - 1));
+
+    simulationCompleted = false;
+    currentQuestionIndex = targetIndex;
+    recalculateSessionScore();
+    resetCurrentFlow(false);
+
+    hideSuspendedBanner();
+    logEvent(`Ripreso test in corso di ${currentQuizSession.subject} alla domanda ${currentQuestionIndex + 1}.`);
+    speakText(`Test di ${currentQuizSession.subject} ripreso alla ${currentQuestion().title}.`, { interrupt: true, rate: 1.02 });
+}
+
+function restartQuizSession(session) {
+    if (!session || !Array.isArray(session.domande) || session.domande.length === 0) {
+        return;
+    }
+    questionSet = cloneQuestionSet(session.domande);
+    currentQuizSession.id = `quiz_${Date.now()}`;
+    currentQuizSession.student = session.studente || currentQuizSession.student;
+    currentQuizSession.subject = session.materia || currentQuizSession.subject;
+    currentQuizSession.startedAt = new Date().toISOString();
+    currentQuizSession.answers = [];
+    currentQuizSession.fileName = null;
+    currentQuizSession.status = 'in_corso';
+
+    simulationCompleted = false;
+    currentQuestionIndex = 0;
+    recalculateSessionScore();
+    resetCurrentFlow(false);
+
+    hideSuspendedBanner();
+    logEvent(`Riavviato test di ${currentQuizSession.subject} dalla prima domanda.`);
+    speakText(`Test di ${currentQuizSession.subject} riavviato dall'inizio. ${currentQuestion().title}.`, { interrupt: true, rate: 1.02 });
+    void savePartialQuizSession();
+}
+
+function hideSuspendedBanner() {
+    const modal = document.getElementById('studentSuspendedModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
 
 const CHOICE_THEMES = [
     'linear-gradient(135deg, #36d8ff, #246bff)',
@@ -212,11 +415,11 @@ function currentQuestion() {
     return questionSet[currentQuestionIndex];
 }
 
-// Le domande con due sole opzioni sono "a scelta libera": lo studente sceglie
-// tra le due alternative e la risposta viene accettata senza segnalare errori.
+// Domanda a scelta libera (survey / comunicazione): solo se priva di risposta esatta definita.
 function isFreeChoiceQuestion() {
     const question = currentQuestion();
-    return !!question && Array.isArray(question.options) && question.options.length <= 2;
+    if (!question) return false;
+    return question.freeChoice === true || question.correctIndex === null || question.correctIndex === undefined || question.correctIndex < 0;
 }
 
 function createEmptyFraming(cameraRunning) {
@@ -404,12 +607,19 @@ function resolveCorrectIndex(value, options, questionIndex) {
         }
     }
 
-    const normalized = String(value || '').trim();
+    const normalized = String(value ?? '').trim();
+    if (!normalized) {
+        return null;
+    }
+
     const upper = normalized.toUpperCase();
     const numeric = Number.parseInt(normalized, 10);
 
     if (OPTION_LETTERS.includes(upper)) {
-        return OPTION_LETTERS.indexOf(upper);
+        const idx = OPTION_LETTERS.indexOf(upper);
+        if (idx < options.length) {
+            return idx;
+        }
     }
     if (!Number.isNaN(numeric)) {
         if (numeric >= 1 && numeric <= options.length) {
@@ -425,32 +635,35 @@ function resolveCorrectIndex(value, options, questionIndex) {
         return matchedByText;
     }
 
-    throw new Error(`Domanda ${questionIndex + 1}: risposta corretta non valida.`);
+    throw new Error(`Domanda ${questionIndex + 1}: risposta corretta "${value}" non valida per ${options.length} opzioni disponibili.`);
 }
 
 function normalizeQuestion(rawQuestion, index) {
-    const title = String(rawQuestion.title || `Domanda ${index + 1}`).trim();
-    const prompt = String(rawQuestion.prompt || rawQuestion.question || rawQuestion.domanda || '').trim();
-    const options = Array.isArray(rawQuestion.options)
-        ? rawQuestion.options.map((option) => String(option || '').trim())
-        : [rawQuestion.optionA || rawQuestion.a, rawQuestion.optionB || rawQuestion.b, rawQuestion.optionC || rawQuestion.c, rawQuestion.optionD || rawQuestion.d]
-            .map((option) => String(option || '').trim());
+    const title = String(rawQuestion.title || rawQuestion.titolo || `Domanda ${index + 1}`).trim();
+    const prompt = String(rawQuestion.prompt || rawQuestion.question || rawQuestion.domanda || rawQuestion.testo || rawQuestion.testodomanda || rawQuestion.quesito || '').trim();
+    
+    let rawOpts = Array.isArray(rawQuestion.options)
+        ? rawQuestion.options
+        : [
+            rawQuestion.optionA || rawQuestion.opzioneA || rawQuestion.rispostaA || rawQuestion.a || rawQuestion.opzione1 || rawQuestion.risposta1,
+            rawQuestion.optionB || rawQuestion.opzioneB || rawQuestion.rispostaB || rawQuestion.b || rawQuestion.opzione2 || rawQuestion.risposta2,
+            rawQuestion.optionC || rawQuestion.opzioneC || rawQuestion.rispostaC || rawQuestion.c || rawQuestion.opzione3 || rawQuestion.risposta3,
+            rawQuestion.optionD || rawQuestion.opzioneD || rawQuestion.rispostaD || rawQuestion.d || rawQuestion.opzione4 || rawQuestion.risposta4
+        ];
 
-    // Scarta le opzioni vuote in coda: cosi sono ammesse le domande con sole 2 risposte
-    // (C e D assenti) oltre a quelle classiche con 4 opzioni.
-    while (options.length > 0 && !options[options.length - 1]) {
-        options.pop();
-    }
+    const options = rawOpts
+        .map((option) => String(option ?? '').trim())
+        .filter(Boolean);
 
     if (!prompt) {
         throw new Error(`Domanda ${index + 1}: testo domanda mancante.`);
     }
-    if (options.length < 2 || options.length > 4 || options.some((option) => !option)) {
-        throw new Error(`Domanda ${index + 1}: servono da 2 a 4 opzioni compilate.`);
+    if (options.length < 2 || options.length > 4) {
+        throw new Error(`Domanda ${index + 1}: servono da 2 a 4 risposte compilate (trovate ${options.length}).`);
     }
 
     const correctIndex = resolveCorrectIndex(
-        rawQuestion.correctIndex ?? rawQuestion.correct ?? rawQuestion.corretta ?? rawQuestion.answer ?? rawQuestion.risposta,
+        rawQuestion.correctIndex ?? rawQuestion.correct ?? rawQuestion.corretta ?? rawQuestion.rispostaesatta ?? rawQuestion.rispostacorretta ?? rawQuestion.esatta ?? rawQuestion.answer ?? rawQuestion.risposta ?? rawQuestion.soluzione,
         options,
         index
     );
@@ -499,7 +712,15 @@ async function fetchJson(path, options = {}) {
     });
 
     const text = await response.text();
-    const payload = text ? JSON.parse(text) : {};
+    let payload = {};
+    try {
+        payload = text ? JSON.parse(text) : {};
+    } catch (e) {
+        if (!response.ok) {
+            throw new Error(text || `Richiesta non riuscita (${response.status}).`);
+        }
+        throw new Error('Risposta del server non valida.');
+    }
 
     if (!response.ok) {
         throw new Error(payload.error || `Richiesta non riuscita (${response.status}).`);
@@ -590,8 +811,18 @@ function buildStudentSnapshot(includeFrames = false) {
         } : null,
         events: remoteEventHistory.slice(0, CONFIG.eventLogSize),
         remote: {
-            status: remoteSyncStatus.textContent,
-            teacherUrl: teacherUrlHint.textContent
+            status: remoteSyncStatus ? remoteSyncStatus.textContent : '',
+            teacherUrl: teacherUrlHint ? teacherUrlHint.textContent : ''
+        },
+        quizSession: {
+            id: currentQuizSession.id,
+            student: currentQuizSession.student,
+            subject: currentQuizSession.subject,
+            status: currentQuizSession.status,
+            startedAt: currentQuizSession.startedAt,
+            answersCount: currentQuizSession.answers.filter(Boolean).length,
+            score: currentQuizSession.score,
+            fileName: currentQuizSession.fileName
         },
         updatedAt: new Date().toISOString()
     };
@@ -753,14 +984,23 @@ function mapRowToQuestion(row, rowIndex) {
         return accumulator;
     }, {});
 
+    const title = normalizedRow.title || normalizedRow.titolo || `Domanda ${rowIndex + 1}`;
+    const prompt = normalizedRow.prompt || normalizedRow.question || normalizedRow.domanda || normalizedRow.testo || normalizedRow.testodomanda || normalizedRow.quesito;
+    const optA = normalizedRow.optiona || normalizedRow.opzionea || normalizedRow.rispostaa || normalizedRow.a || normalizedRow.opzione1 || normalizedRow.risposta1 || '';
+    const optB = normalizedRow.optionb || normalizedRow.opzioneb || normalizedRow.rispostab || normalizedRow.b || normalizedRow.opzione2 || normalizedRow.risposta2 || '';
+    const optC = normalizedRow.optionc || normalizedRow.opzionec || normalizedRow.rispostac || normalizedRow.c || normalizedRow.opzione3 || normalizedRow.risposta3 || '';
+    const optD = normalizedRow.optiond || normalizedRow.opzioned || normalizedRow.rispostad || normalizedRow.d || normalizedRow.opzione4 || normalizedRow.risposta4 || '';
+    const correct = normalizedRow.correct ?? normalizedRow.corretta ?? normalizedRow.rispostaesatta ?? normalizedRow.rispostacorretta ?? normalizedRow.esatta ?? normalizedRow.answer ?? normalizedRow.risposta ?? normalizedRow.soluzione ?? normalizedRow.chiave;
+
+    const rawOptions = [optA, optB, optC, optD]
+        .map((opt) => String(opt || '').trim())
+        .filter(Boolean);
+
     return normalizeQuestion({
-        title: normalizedRow.title || normalizedRow.titolo || `Domanda ${rowIndex + 1}`,
-        prompt: normalizedRow.prompt || normalizedRow.question || normalizedRow.domanda || normalizedRow.testo || normalizedRow.testodomanda,
-        optionA: normalizedRow.optiona || normalizedRow.opzionea || normalizedRow.a,
-        optionB: normalizedRow.optionb || normalizedRow.opzioneb || normalizedRow.b,
-        optionC: normalizedRow.optionc || normalizedRow.opzionec || normalizedRow.c,
-        optionD: normalizedRow.optiond || normalizedRow.opzioned || normalizedRow.d,
-        correct: normalizedRow.correct || normalizedRow.corretta || normalizedRow.answer || normalizedRow.rispostaesatta || normalizedRow.risposta
+        title,
+        prompt,
+        options: rawOptions,
+        correct
     }, rowIndex);
 }
 
@@ -778,27 +1018,30 @@ function parseCsvQuestions(text) {
     const findColumn = (variants) => headers.findIndex((header) => variants.includes(header));
 
     const titleIndex = findColumn(['title', 'titolo']);
-    const promptIndex = findColumn(['prompt', 'question', 'domanda', 'testo', 'testodomanda']);
-    const optionAIndex = findColumn(['optiona', 'opzionea', 'a']);
-    const optionBIndex = findColumn(['optionb', 'opzioneb', 'b']);
-    const optionCIndex = findColumn(['optionc', 'opzionec', 'c']);
-    const optionDIndex = findColumn(['optiond', 'opzioned', 'd']);
-    const correctIndex = findColumn(['correct', 'corretta', 'answer', 'rispostaesatta', 'risposta']);
+    const promptIndex = findColumn(['prompt', 'question', 'domanda', 'testo', 'testodomanda', 'quesito']);
+    const optionAIndex = findColumn(['optiona', 'opzionea', 'rispostaa', 'a', 'opzione1', 'risposta1']);
+    const optionBIndex = findColumn(['optionb', 'opzioneb', 'rispostab', 'b', 'opzione2', 'risposta2']);
+    const optionCIndex = findColumn(['optionc', 'opzionec', 'rispostac', 'c', 'opzione3', 'risposta3']);
+    const optionDIndex = findColumn(['optiond', 'opzioned', 'rispostad', 'd', 'opzione4', 'risposta4']);
+    const correctIndex = findColumn(['correct', 'corretta', 'rispostaesatta', 'rispostacorretta', 'esatta', 'answer', 'risposta', 'soluzione', 'chiave']);
 
-    if ([promptIndex, optionAIndex, optionBIndex, optionCIndex, optionDIndex, correctIndex].some((index) => index < 0)) {
-        throw new Error('Il CSV deve avere le colonne: prompt, optionA, optionB, optionC, optionD, correct.');
+    if (promptIndex < 0 || optionAIndex < 0 || optionBIndex < 0) {
+        throw new Error('Il CSV deve contenere almeno le colonne: Domanda, Risposta A, Risposta B.');
     }
 
     return rows.slice(1).map((line, rowIndex) => {
         const columns = splitCsvLine(line);
+        const optA = optionAIndex >= 0 ? columns[optionAIndex] : '';
+        const optB = optionBIndex >= 0 ? columns[optionBIndex] : '';
+        const optC = optionCIndex >= 0 ? columns[optionCIndex] : '';
+        const optD = optionDIndex >= 0 ? columns[optionDIndex] : '';
+        const rawOptions = [optA, optB, optC, optD].map((opt) => String(opt || '').trim()).filter(Boolean);
+
         return normalizeQuestion({
-            title: titleIndex >= 0 ? columns[titleIndex] : `Domanda ${rowIndex + 1}`,
+            title: titleIndex >= 0 && columns[titleIndex] ? columns[titleIndex] : `Domanda ${rowIndex + 1}`,
             prompt: columns[promptIndex],
-            optionA: columns[optionAIndex],
-            optionB: columns[optionBIndex],
-            optionC: columns[optionCIndex],
-            optionD: columns[optionDIndex],
-            correct: columns[correctIndex]
+            options: rawOptions,
+            correct: correctIndex >= 0 ? columns[correctIndex] : null
         }, rowIndex);
     });
 }
@@ -970,10 +1213,11 @@ function downloadTextFile(fileName, content, mimeType) {
 
 function createCsvTemplate() {
     return [
-        'title,prompt,optionA,optionB,optionC,optionD,correct',
-        'Domanda 1,Quale pianeta e conosciuto come Pianeta Rosso?,Marte,Giove,Venere,Nettuno,A',
-        'Domanda 2,Quale comando attiva lo scroll della risposta?,Apertura bocca,Chiusura occhi,Rotazione testa,Sorriso,A'
-    ].join('\n');
+        'Titolo,Domanda,Risposta A,Risposta B,Risposta C,Risposta D,Risposta Esatta',
+        '"Esempio 4 Scelte","Quale pianeta del nostro sistema solare e conosciuto come il Pianeta Rosso?","Marte","Giove","Venere","Nettuno","A"',
+        '"Esempio 3 Scelte","Quale fra questi e uno stato fisico fondamentale della materia?","Solido","Elettrico","Magnetico","","A"',
+        '"Esempio 2 Scelte (Vero/Falso)","Il Sole e una stella situata al centro del nostro sistema planetario?","Vero","Falso","","","A"'
+    ].join('\r\n');
 }
 
 function createJsonTemplate() {
@@ -1070,7 +1314,7 @@ function queueQuestionAsNext(rawQuestion, source = 'Tablet docente') {
     });
 }
 
-function publishQuestionBatchNow(rawQuestions, source = 'Tablet docente') {
+function publishQuestionBatchNow(rawQuestions, source = 'Tablet docente', subject = null) {
     if (!Array.isArray(rawQuestions) || rawQuestions.length === 0) {
         throw new Error('Nessuna domanda trovata nel file importato.');
     }
@@ -1083,9 +1327,11 @@ function publishQuestionBatchNow(rawQuestions, source = 'Tablet docente') {
 
     simulationCompleted = false;
     currentQuestionIndex = 0;
+    initQuizSession(subject || currentQuizSession.subject || 'Italiano', questionSet);
     resetCurrentFlow(false);
     updateImportStatus(`File docente pubblicato da ${source} (${questionSet.length} domande)`);
     logEvent(`${source}: pubblicato file con ${questionSet.length} domande. Ora attiva ${firstQuestion.title}.`);
+    void savePartialQuizSession();
     // La lettura vocale della domanda viene avviata dal gestore del comando
     // (dopo l'attivazione della webcam), per non sovrapporre piu' annunci.
 }
@@ -1197,7 +1443,7 @@ async function executeRemoteCommand(command) {
     }
 
     if (command.type === 'publish-batch') {
-        publishQuestionBatchNow(payload.questions || [], 'Tablet docente');
+        publishQuestionBatchNow(payload.questions || [], 'Tablet docente', payload.subject);
         // Pubblicando il quiz lo studente deve poter rispondere: attiva la webcam
         // senza annunciarla, poi legge subito la domanda attiva.
         if (!isRunning) {
@@ -1208,6 +1454,73 @@ async function executeRemoteCommand(command) {
         return 'File di domande pubblicato subito sul PC.';
     }
 
+    if (command.type === 'resume-session') {
+        let session = payload.session;
+        if (!session) {
+            try {
+                const res = await fetchJson('/api/quiz/active-session');
+                session = res && res.session;
+            } catch (err) {}
+        }
+        if (session) {
+            resumeQuizSession(session);
+            if (!isRunning) {
+                await startCamera({ announce: false });
+            }
+            void readCurrentQuestion();
+            return `Test di ${session.materia || 'materia'} ripreso con successo alla domanda ${currentQuestionIndex + 1}.`;
+        }
+        return 'Nessun test sospeso trovato da riprendere.';
+    }
+
+    if (command.type === 'restart-session') {
+        let session = payload.session;
+        if (!session) {
+            try {
+                const res = await fetchJson('/api/quiz/active-session');
+                session = res && res.session;
+            } catch (err) {}
+        }
+        if (session) {
+            restartQuizSession(session);
+            if (!isRunning) {
+                await startCamera({ announce: false });
+            }
+            void readCurrentQuestion();
+            return `Test di ${session.materia || 'materia'} riavviato dall'inizio.`;
+        }
+        return 'Nessun test trovato da riavviare.';
+    }
+
+    if (command.type === 'new-session') {
+        initQuizSession(payload.subject || 'Italiano', DEFAULT_QUESTION_SET);
+        questionSet = cloneQuestionSet(DEFAULT_QUESTION_SET);
+        currentQuestionIndex = 0;
+        simulationCompleted = false;
+        resetCurrentFlow(true);
+        hideSuspendedBanner();
+        logEvent('Nuovo test pronto ad essere avviato.');
+        return 'Nuova sessione di test avviata.';
+    }
+
+    if (command.type === 'set-student') {
+        if (payload.student) {
+            currentQuizSession.student = payload.student;
+            logEvent(`Studente attivo impostato su: ${payload.student}`);
+            return `Studente impostato su: ${payload.student}`;
+        }
+        return 'Nome studente non specificato.';
+    }
+
+    if (command.type === 'set-subject') {
+        if (payload.subject) {
+            currentQuizSession.subject = payload.subject;
+            logEvent(`Materia attiva impostata su: ${payload.subject}`);
+            return `Materia impostata su: ${payload.subject}`;
+        }
+        return 'Materia non specificata.';
+    }
+
     if (command.type === 'queue-batch') {
         queueQuestionBatchAsNext(payload.questions || [], 'Tablet docente');
         return 'File di domande aggiunto in coda sul PC.';
@@ -1216,19 +1529,19 @@ async function executeRemoteCommand(command) {
     if (command.type === 'next-question') {
         ensureAudioContext();
         if (simulationCompleted) {
-            return 'Materia gia completata: nessuna domanda successiva.';
+            return 'Quiz gia completato: nessuna domanda successiva.';
         }
         const wasLast = currentQuestionIndex >= questionSet.length - 1;
         advanceQuestion();
         return wasLast
-            ? 'Materia completata sul PC.'
+            ? 'Quiz completato sul PC.'
             : 'Passaggio alla domanda successiva sul PC.';
     }
 
     if (command.type === 'repeat-question') {
         ensureAudioContext();
         if (simulationCompleted) {
-            return 'Materia completata: nessuna domanda da ripetere.';
+            return 'Quiz completato: nessuna domanda da ripetere.';
         }
         resetCurrentFlow(false);
         logEvent('Tablet docente: ripetizione della domanda corrente.');
@@ -1682,9 +1995,9 @@ function logEvent(message) {
 function updateQuestionHeader() {
     clearReadingHighlight();
     if (simulationCompleted) {
-        questionTitle.textContent = 'Materia completata';
+        questionTitle.textContent = 'Quiz completato';
         questionCounter.textContent = `${questionSet.length} / ${questionSet.length}`;
-        questionText.textContent = 'Materia completata. In pausa, in attesa che il professore scelga la prossima materia o concluda l\'esame.';
+        questionText.textContent = 'Quiz completato. In pausa, in attesa che il professore carichi nuove domande o concluda la sessione.';
         requestStudentSnapshotSync();
         return;
     }
@@ -1713,15 +2026,69 @@ function syncConfirmCard() {
         : 'linear-gradient(90deg, #2de2e6, #ffd166)';
 }
 
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function renderChoices() {
     clearReadingHighlight();
     if (simulationCompleted) {
         choicesGrid.innerHTML = '';
+        choicesGrid.dataset.count = '0';
+        choicesGrid.className = 'choices-grid choices-grid--completed';
         choiceButtons = [];
+
+        const score = currentQuizSession.score || recalculateSessionScore();
+        const student = currentQuizSession.student || 'Studente';
+        const subject = currentQuizSession.subject || 'Quiz';
+        const fileParam = currentQuizSession.fileName ? `&file=${encodeURIComponent(currentQuizSession.fileName)}` : '';
+        const printUrl = `/stampa-risultato?student=${encodeURIComponent(student)}${fileParam}&autoPrint=1`;
+
+        const completedBox = document.createElement('div');
+        completedBox.className = 'quiz-completed-box';
+        completedBox.innerHTML = `
+            <div class="completed-badge">🎉 Quiz Concluso</div>
+            <h2 class="completed-subject-title">Risultati: ${escapeHtml(subject)}</h2>
+            <p class="completed-student-name">Studente: <strong>${escapeHtml(student)}</strong></p>
+            <div class="completed-score-grid">
+                <div class="score-card score-card--pct">
+                    <span class="score-val">${score.percentuale}%</span>
+                    <span class="score-lbl">Esito complessivo</span>
+                </div>
+                <div class="score-card score-card--correct">
+                    <span class="score-val">${score.esatte}</span>
+                    <span class="score-lbl">Risposte esatte</span>
+                </div>
+                <div class="score-card score-card--wrong">
+                    <span class="score-val">${score.errate}</span>
+                    <span class="score-lbl">Risposte errate</span>
+                </div>
+                <div class="score-card score-card--total">
+                    <span class="score-val">${score.totaleRisposte} / ${questionSet.length}</span>
+                    <span class="score-lbl">Domande completate</span>
+                </div>
+            </div>
+            <div class="completed-actions">
+                <a href="${printUrl}" target="_blank" class="action-btn primary completed-print-btn">
+                    🖨️ Stampa Scheda Risultati (PDF)
+                </a>
+            </div>
+        `;
+        choicesGrid.appendChild(completedBox);
         return;
     }
 
     const question = currentQuestion();
+    const count = question.options.length;
+    choicesGrid.dataset.count = String(count);
+    choicesGrid.className = `choices-grid choices-grid--${count}`;
+
     choicesGrid.innerHTML = question.options.map((option, index) => `
         <button class="choice-card" data-index="${index}" style="--choice-bg: ${CHOICE_THEMES[index]}; --progress: 0;">
             <div class="choice-progress"></div>
@@ -1874,12 +2241,16 @@ function resetCurrentFlow(goToStart = false) {
 
 function completeSimulation() {
     simulationCompleted = true;
+    currentQuizSession.status = 'completato';
+    recalculateSessionScore();
+    void saveTotalQuizSession();
+
     setState('done');
     updateQuestionHeader();
     renderChoices();
-    setCommandState('Materia completata - in pausa');
-    logEvent('Materia completata. In pausa, in attesa del professore.');
-    speakText('Materia completata. Restiamo in pausa, in attesa del professore.', { interrupt: true, rate: 1.02 });
+    setCommandState('Quiz completato - in pausa');
+    logEvent('Quiz completato. Risultati salvati nella cartella dello studente.');
+    speakText('Quiz completato. Risultati salvati.', { interrupt: true, rate: 1.02 });
 }
 
 function advanceQuestion() {
@@ -2213,6 +2584,23 @@ function confirmSelection(source) {
     const outcome = freeChoice ? 'accepted' : (isCorrect ? 'correct' : 'wrong');
     const positive = outcome !== 'wrong';
     playChime(positive ? 'success' : 'miss');
+
+    const curQ = currentQuestion();
+    currentQuizSession.answers[currentQuestionIndex] = {
+        questionIndex: currentQuestionIndex,
+        questionTitle: curQ.title,
+        prompt: curQ.prompt,
+        options: [...curQ.options],
+        correctIndex: curQ.correctIndex,
+        chosenIndex: answerLockedIndex,
+        chosenText: curQ.options[answerLockedIndex] || '',
+        outcome: outcome,
+        isCorrect: isCorrect,
+        freeChoice: freeChoice,
+        answeredAt: new Date().toISOString()
+    };
+    recalculateSessionScore();
+    void savePartialQuizSession();
 
     const { title, subtitle } = showAnswerFeedback(outcome);
     const spokenFeedback = `${title} ${subtitle}`;
@@ -2652,7 +3040,7 @@ async function runAutomaticDemo() {
     manualLock = false;
     resetCurrentFlow(true);
     ensureAudioContext();
-    logEvent('Avvio demo automatica del processo Kahoot.');
+    logEvent('Avvio demo automatica del processo di risposta.');
     speakText('Avvio demo automatica del processo di risposta.', { interrupt: true, rate: 1.02 });
 
     await sleep(650);
@@ -2771,25 +3159,107 @@ resetCurrentFlow(true);
 logEvent('Profilo calibrato caricato: EAR 0.13, MAR 0.17, occhiali attivi.');
 setCommandState('In attesa');
 startRemoteSync();
-void loadDefaultSubjectQuestions();
 
 examStarted = true;
 setCommandState('In attesa');
 
-async function loadDefaultSubjectQuestions() {
+let suspendedSessionData = null;
+
+async function checkSuspendedQuizSession() {
     try {
-        const raw = await fetchJson(`/domande/${DEFAULT_SUBJECT}.json`);
-        if (!Array.isArray(raw) || raw.length === 0) {
-            return;
+        const studentInfo = await fetchJson('/api/student/info');
+        if (studentInfo && studentInfo.activeStudent) {
+            currentQuizSession.student = studentInfo.activeStudent;
         }
-        const normalized = raw.map((question, index) => normalizeQuestion(question, index));
-        questionSet = cloneQuestionSet(normalized);
-        resetCurrentFlow(true);
-        logEvent(`Domande iniziali caricate dalla materia ${DEFAULT_SUBJECT} (${questionSet.length}).`);
-    } catch (error) {
-        logEvent(`Materia di default non caricata (${error.message}). Uso il set incluso.`);
+        if (studentInfo && studentInfo.activeSubject) {
+            currentQuizSession.subject = studentInfo.activeSubject;
+        }
+
+        const data = await fetchJson('/api/quiz/active-session');
+        if (data && data.session && Array.isArray(data.session.domande) && data.session.domande.length > 0) {
+            suspendedSessionData = data.session;
+            showSuspendedModal(data.session);
+        }
+    } catch (e) {
+        console.warn('Controllo sessione sospesa fallito:', e);
     }
 }
+
+function showSuspendedModal(session) {
+    const modal = document.getElementById('studentSuspendedModal');
+    if (!modal) return;
+
+    const subjectSpan = document.getElementById('suspendedModalSubject');
+    const dateSpan = document.getElementById('suspendedModalDate');
+    const progressSpan = document.getElementById('suspendedModalProgress');
+    const scoreSpan = document.getElementById('suspendedModalScore');
+
+    if (subjectSpan) subjectSpan.textContent = session.materia || 'Quiz';
+    if (dateSpan) dateSpan.textContent = session.dataInizio || session.data || '-';
+    const totalQ = session.totaleDomande || session.domande?.length || 0;
+    const answeredCount = Array.isArray(session.answers) ? session.answers.filter(Boolean).length : 0;
+    if (progressSpan) progressSpan.textContent = `${answeredCount} di ${totalQ} risposte fornite (prossima: domanda ${(session.currentQuestionIndex || 0) + 1})`;
+    if (scoreSpan && session.score) {
+        scoreSpan.textContent = `${session.score.esatte || 0} esatte, ${session.score.errate || 0} errate (${session.score.percentuale || 0}%)`;
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function initSuspendedModalHandlers() {
+    const resumeBtn = document.getElementById('resumeSuspendedBtn');
+    const restartBtn = document.getElementById('restartSuspendedBtn');
+    const newBtn = document.getElementById('newSuspendedBtn');
+
+    if (resumeBtn) {
+        resumeBtn.addEventListener('click', async () => {
+            if (suspendedSessionData) {
+                resumeQuizSession(suspendedSessionData);
+                try {
+                    await fetchJson('/api/quiz/session-action', {
+                        method: 'POST',
+                        body: JSON.stringify({ action: 'resume' })
+                    });
+                } catch (e) {}
+                hideSuspendedBanner();
+            }
+        });
+    }
+
+    if (restartBtn) {
+        restartBtn.addEventListener('click', async () => {
+            if (suspendedSessionData) {
+                restartQuizSession(suspendedSessionData);
+                try {
+                    await fetchJson('/api/quiz/session-action', {
+                        method: 'POST',
+                        body: JSON.stringify({ action: 'restart' })
+                    });
+                } catch (e) {}
+                hideSuspendedBanner();
+            }
+        });
+    }
+
+    if (newBtn) {
+        newBtn.addEventListener('click', async () => {
+            try {
+                await fetchJson('/api/quiz/session-action', {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'new' })
+                });
+            } catch (e) {}
+            hideSuspendedBanner();
+            resetCurrentFlow(true);
+            logEvent('Sessione sospesa archiviata. Pronto per un nuovo test.');
+            speakText('Pronto per un nuovo test.', { interrupt: true, rate: 1.02 });
+        });
+    }
+}
+
+initSuspendedModalHandlers();
+void checkSuspendedQuizSession();
+
 
 
 

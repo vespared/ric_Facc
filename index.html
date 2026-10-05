@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ric_Facc | Simulazione Kahoot Accessibile</title>
+    <title>Ric_Facc | Quiz Accessibile</title>
 
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
@@ -12,6 +12,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
         crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+    <script src="xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/mammoth/mammoth.browser.min.js" crossorigin="anonymous"></script>
 
@@ -44,7 +45,6 @@
                     </div>
 
                     <article class="question-card">
-                        <p class="question-label">Test Kahoot</p>
                         <p class="question-text" id="questionText"></p>
                         <div class="command-strip student-hidden-ui" aria-hidden="true">
                             <span class="command-chip mouth" id="mouthCommandLabel">Bocca: Scroll / Conferma</span>
@@ -81,47 +81,46 @@
                         </div>
                     </div>
                 </div>
-
-                <div class="import-card student-hidden-ui" aria-hidden="true">
-                    <div class="card-topline">
-                        <span class="card-kicker">Importa domande</span>
-                        <span class="card-status" id="importStatus">Formato consigliato: XLSX o CSV da Excel</span>
-                    </div>
-
-                    <label class="file-picker" for="questionFileInput">
-                        <span>Carica file test</span>
-                        <strong>XLSX, DOCX, CSV, JSON o TXT</strong>
-                    </label>
-                    <input id="questionFileInput" class="file-input" type="file" accept=".xlsx,.docx,.csv,.json,.txt">
-
-                    <div class="template-grid">
-                        <button id="downloadCsvTemplateBtn" class="action-btn secondary">Scarica template CSV</button>
-                        <button id="downloadJsonTemplateBtn" class="action-btn secondary">Scarica template JSON</button>
-                        <button id="restoreDefaultQuestionsBtn" class="action-btn secondary">Ripristina test base</button>
-                    </div>
-
-                    <ul class="format-list">
-                        <li><strong>Excel:</strong> puoi caricare direttamente <code>.xlsx</code> oppure usare <code>.csv</code>.</li>
-                        <li><strong>Word:</strong> puoi caricare direttamente <code>.docx</code> oppure usare <code>.txt</code> con blocchi separati.</li>
-                        <li><strong>Campi richiesti:</strong> titolo, testo domanda, 4 risposte, risposta corretta.</li>
-                    </ul>
-                </div>
-
-                <div class="network-card student-hidden-ui" aria-hidden="true">
-                    <div class="card-topline">
-                        <span class="card-kicker">Supporto docente in rete</span>
-                        <span class="card-status" id="remoteSyncStatus">Avvia il server locale per collegare il tablet docente</span>
-                    </div>
-                    <p class="network-text">
-                        Quando il quiz viene aperto tramite server locale, il professore puo controllare il flusso dal tablet
-                        e pubblicare domande nuove in tempo reale sulla stessa rete.
-                    </p>
-                    <div class="network-hint" id="teacherUrlHint">Percorso docente: /teacher.html</div>
-                </div>
             </section>
         </main>
 
         <section class="developer-bridge-hidden" aria-hidden="true" inert>
+            <div class="import-card student-hidden-ui" aria-hidden="true">
+                <div class="card-topline">
+                    <span class="card-kicker">Importa domande</span>
+                    <span class="card-status" id="importStatus">Formato consigliato: XLSX o CSV da Excel</span>
+                </div>
+
+                <label class="file-picker" for="questionFileInput">
+                    <span>Carica file test</span>
+                    <strong>XLSX, DOCX, CSV, JSON o TXT</strong>
+                </label>
+                <input id="questionFileInput" class="file-input" type="file" accept=".xlsx,.docx,.csv,.json,.txt">
+
+                <div class="template-grid">
+                    <button id="downloadCsvTemplateBtn" class="action-btn secondary">Scarica template CSV</button>
+                    <button id="downloadJsonTemplateBtn" class="action-btn secondary">Scarica template JSON</button>
+                    <button id="restoreDefaultQuestionsBtn" class="action-btn secondary">Ripristina test base</button>
+                </div>
+
+                <ul class="format-list">
+                    <li><strong>Excel:</strong> puoi caricare direttamente <code>.xlsx</code> oppure usare <code>.csv</code>.</li>
+                    <li><strong>Word:</strong> puoi caricare direttamente <code>.docx</code> oppure usare <code>.txt</code> con blocchi separati.</li>
+                    <li><strong>Campi richiesti:</strong> titolo (opzionale), testo domanda, da 2 a 4 risposte, risposta corretta.</li>
+                </ul>
+            </div>
+
+            <div class="network-card student-hidden-ui" aria-hidden="true">
+                <div class="card-topline">
+                    <span class="card-kicker">Supporto docente in rete</span>
+                    <span class="card-status" id="remoteSyncStatus">Avvia il server locale per collegare il tablet docente</span>
+                </div>
+                <p class="network-text">
+                    Quando il quiz viene aperto tramite server locale, il professore puo controllare il flusso dal tablet
+                    e pubblicare domande nuove in tempo reale sulla stessa rete.
+                </p>
+                <div class="network-hint" id="teacherUrlHint">Percorso docente: /teacher.html</div>
+            </div>
             <div class="video-card">
                 <div class="card-topline">
                     <span class="card-kicker">Tracking live</span>
@@ -241,7 +240,36 @@
         </section>
     </div>
 
+    <!-- Modal sessione sospesa studente -->
+    <div id="studentSuspendedModal" class="student-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="suspendedModalTitle">
+        <div class="student-modal-card">
+            <div class="student-modal-header">
+                <span class="student-modal-kicker">Test in sospeso trovato</span>
+                <h2 id="suspendedModalTitle">Vuoi continuare il test precedente?</h2>
+            </div>
+            <div class="student-modal-info">
+                <div class="info-row"><span>Materia:</span> <strong id="suspendedModalSubject">Italiano</strong></div>
+                <div class="info-row"><span>Data avvio:</span> <strong id="suspendedModalDate">-</strong></div>
+                <div class="info-row"><span>Avanzamento:</span> <strong id="suspendedModalProgress">-</strong></div>
+                <div class="info-row"><span>Punteggio parziale:</span> <strong id="suspendedModalScore">-</strong></div>
+            </div>
+            <p class="student-modal-desc">
+                C'era un test interrotto prima del termine. Scegli cosa desideri fare:
+            </p>
+            <div class="student-modal-actions">
+                <button type="button" id="resumeSuspendedBtn" class="action-btn primary student-modal-btn">
+                    ▶️ Riprendi da dove eri rimasto
+                </button>
+                <button type="button" id="restartSuspendedBtn" class="action-btn secondary student-modal-btn">
+                    🔄 Rinizia lo stesso test dall'inizio
+                </button>
+                <button type="button" id="newSuspendedBtn" class="action-btn ghost student-modal-btn">
+                    ✨ Inizia un nuovo test
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
-
 </html>

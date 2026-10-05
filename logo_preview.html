@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1024px;
+      height: 1024px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+    .badge-container {
+      width: 1024px;
+      height: 1024px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="badge-container">
+    <svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <!-- Background Gradients -->
+        <radialGradient id="bgGlow" cx="50%" cy="40%" r="60%">
+          <stop offset="0%" stop-color="#4F46E5" />
+          <stop offset="45%" stop-color="#2563EB" />
+          <stop offset="85%" stop-color="#0F172A" />
+          <stop offset="100%" stop-color="#090D16" />
+        </radialGradient>
+
+        <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#38BDF8" />
+          <stop offset="35%" stop-color="#818CF8" />
+          <stop offset="70%" stop-color="#F472B6" />
+          <stop offset="100%" stop-color="#F59E0B" />
+        </linearGradient>
+
+        <linearGradient id="bubbleGrad" x1="15%" y1="10%" x2="85%" y2="90%">
+          <stop offset="0%" stop-color="#FFFFFF" />
+          <stop offset="25%" stop-color="#F0FDF4" />
+          <stop offset="70%" stop-color="#DCFCE7" />
+          <stop offset="100%" stop-color="#BBF7D0" />
+        </linearGradient>
+
+        <linearGradient id="bookGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#F59E0B" />
+          <stop offset="100%" stop-color="#D97706" />
+        </linearGradient>
+
+        <linearGradient id="cardA" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#38BDF8" />
+          <stop offset="100%" stop-color="#0284C7" />
+        </linearGradient>
+
+        <linearGradient id="cardB" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#34D399" />
+          <stop offset="100%" stop-color="#059669" />
+        </linearGradient>
+
+        <linearGradient id="cardC" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#F43F5E" />
+          <stop offset="100%" stop-color="#BE123C" />
+        </linearGradient>
+
+        <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#FDE047" />
+          <stop offset="50%" stop-color="#F59E0B" />
+          <stop offset="100%" stop-color="#B45309" />
+        </linearGradient>
+
+        <!-- Drop Shadows & Filters -->
+        <filter id="shadowBig" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#000000" flood-opacity="0.45" />
+        </filter>
+        <filter id="glowGold" x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#F59E0B" flood-opacity="0.6" />
+        </filter>
+        <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#0F172A" flood-opacity="0.35" />
+        </filter>
+      </defs>
+
+      <!-- Main Circle Base (WhatsApp avatar frame) -->
+      <circle cx="512" cy="512" r="496" fill="url(#bgGlow)" />
+
+      <!-- Glowing Decorative Outer Ring -->
+      <circle cx="512" cy="512" r="486" stroke="url(#ringGrad)" stroke-width="12" fill="none" opacity="0.9" />
+      <circle cx="512" cy="512" r="468" stroke="#FFFFFF" stroke-width="2" stroke-dasharray="10 14" fill="none" opacity="0.25" />
+
+      <!-- Ambient Background Dots & Stars -->
+      <circle cx="210" cy="220" r="14" fill="#38BDF8" opacity="0.4" />
+      <circle cx="820" cy="260" r="18" fill="#F472B6" opacity="0.4" />
+      <circle cx="840" cy="740" r="12" fill="#34D399" opacity="0.35" />
+      <circle cx="190" cy="760" r="16" fill="#F59E0B" opacity="0.35" />
+
+      <!-- Back Glow for central speech bubble -->
+      <circle cx="490" cy="460" r="280" fill="#38BDF8" opacity="0.18" filter="blur(40px)" />
+
+      <!-- ========================================== -->
+      <!-- CENTRAL SPEECH BUBBLE (Logopedia & Voice)  -->
+      <!-- ========================================== -->
+      <g filter="url(#shadowBig)">
+        <!-- Speech Bubble Body -->
+        <path d="M 280 260 
+                 C 340 200, 640 200, 700 260 
+                 C 770 330, 770 510, 700 580 
+                 C 630 650, 480 660, 390 650 
+                 L 290 730 
+                 L 320 630 
+                 C 250 580, 210 510, 220 420 
+                 C 230 330, 240 290, 280 260 Z" 
+              fill="url(#bubbleGrad)" />
+        
+        <!-- Glossy highlight arc on top of speech bubble -->
+        <path d="M 300 280 C 400 230, 600 230, 680 280 C 650 250, 400 240, 300 280 Z" fill="#FFFFFF" opacity="0.8" />
+
+        <!-- Friendly Smile & Cheeks inside the bubble -->
+        <!-- Eyes (Happy Arcs) -->
+        <path d="M 370 380 Q 400 350 430 380" stroke="#0F172A" stroke-width="12" stroke-linecap="round" fill="none" />
+        <path d="M 550 380 Q 580 350 610 380" stroke="#0F172A" stroke-width="12" stroke-linecap="round" fill="none" />
+        
+        <!-- Rosy Cheeks -->
+        <circle cx="360" cy="415" r="22" fill="#F472B6" opacity="0.45" />
+        <circle cx="620" cy="415" r="22" fill="#F472B6" opacity="0.45" />
+
+        <!-- Big Joyful Smile -->
+        <path d="M 410 425 Q 490 510 570 425" stroke="#0F172A" stroke-width="14" stroke-linecap="round" fill="none" />
+        <path d="M 435 448 Q 490 495 545 448 Z" fill="#EF4444" opacity="0.85" />
+        <path d="M 460 450 Q 490 470 520 450 Z" fill="#FFFFFF" />
+      </g>
+
+      <!-- Sound Waves on Left (Communication / Logopedia Symbol) -->
+      <g filter="url(#shadowBig)">
+        <path d="M 175 350 Q 140 420 175 490" stroke="#38BDF8" stroke-width="14" stroke-linecap="round" fill="none" />
+        <path d="M 135 320 Q 90 420 135 520" stroke="#818CF8" stroke-width="12" stroke-linecap="round" fill="none" opacity="0.85" />
+      </g>
+
+      <!-- ========================================== -->
+      <!-- FLOATING QUIZ BADGES: A, B, C (Prof / Quiz) -->
+      <!-- ========================================== -->
+      <!-- Badge A (Top Right) -->
+      <g transform="translate(680, 160) rotate(12)" filter="url(#cardShadow)">
+        <rect x="0" y="0" width="130" height="130" rx="36" fill="url(#cardA)" />
+        <rect x="4" y="4" width="122" height="122" rx="32" stroke="#FFFFFF" stroke-width="4" fill="none" opacity="0.4" />
+        <text x="65" y="86" font-family="'Segoe UI', Arial, sans-serif" font-size="76" font-weight="900" fill="#FFFFFF" text-anchor="middle">A</text>
+      </g>
+
+      <!-- Badge B (Far Right / Mid) -->
+      <g transform="translate(750, 360) rotate(-8)" filter="url(#cardShadow)">
+        <rect x="0" y="0" width="124" height="124" rx="34" fill="url(#cardB)" />
+        <rect x="4" y="4" width="116" height="116" rx="30" stroke="#FFFFFF" stroke-width="4" fill="none" opacity="0.4" />
+        <text x="62" y="83" font-family="'Segoe UI', Arial, sans-serif" font-size="72" font-weight="900" fill="#FFFFFF" text-anchor="middle">B</text>
+      </g>
+
+      <!-- Badge C (Bottom Right) -->
+      <g transform="translate(690, 560) rotate(10)" filter="url(#cardShadow)">
+        <rect x="0" y="0" width="118" height="118" rx="32" fill="url(#cardC)" />
+        <rect x="4" y="4" width="110" height="110" rx="28" stroke="#FFFFFF" stroke-width="4" fill="none" opacity="0.4" />
+        <text x="59" y="79" font-family="'Segoe UI', Arial, sans-serif" font-size="68" font-weight="900" fill="#FFFFFF" text-anchor="middle">C</text>
+      </g>
+
+      <!-- Golden Star / Checkmark (Corretta!) -->
+      <g transform="translate(780, 280)" filter="url(#glowGold)">
+        <circle cx="45" cy="45" r="45" fill="url(#goldGrad)" />
+        <path d="M 28 46 L 40 58 L 64 32" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+      </g>
+
+      <!-- ========================================== -->
+      <!-- TEACHER & SCHOOL FOUNDATION (Book & Banner)-->
+      <!-- ========================================== -->
+      <!-- Open Stylized Book at Bottom -->
+      <g transform="translate(242, 640)" filter="url(#shadowBig)">
+        <!-- Book Pages Left -->
+        <path d="M 270 90 C 200 60, 80 70, 10 90 L 10 160 C 90 140, 200 130, 270 165 Z" fill="#F8FAFC" />
+        <!-- Book Pages Right -->
+        <path d="M 270 90 C 340 60, 460 70, 530 90 L 530 160 C 450 140, 340 130, 270 165 Z" fill="#E2E8F0" />
+        <!-- Book Cover Spine -->
+        <path d="M 0 165 C 100 145, 230 140, 270 178 C 310 140, 440 145, 540 165 L 535 185 C 440 165, 310 160, 270 196 C 230 160, 100 165, 5 185 Z" fill="url(#bookGrad)" />
+      </g>
+
+      <!-- Modern Curved Pill Banner: "LOGO & PROF" -->
+      <g transform="translate(187, 790)" filter="url(#shadowBig)">
+        <!-- Background pill -->
+        <rect x="0" y="0" width="650" height="130" rx="65" fill="#0F172A" />
+        <rect x="3" y="3" width="644" height="124" rx="62" stroke="url(#ringGrad)" stroke-width="6" fill="none" />
+        
+        <!-- Text Inside Banner -->
+        <text x="325" y="65" font-family="'Segoe UI', system-ui, -apple-system, sans-serif" font-size="44" font-weight="900" fill="#FFFFFF" text-anchor="middle" letter-spacing="4">
+          LOGO &amp; PROF
+        </text>
+        <text x="325" y="105" font-family="'Segoe UI', system-ui, -apple-system, sans-serif" font-size="24" font-weight="700" fill="#38BDF8" text-anchor="middle" letter-spacing="6">
+          PAROLE &amp; QUIZ LAB
+        </text>
+      </g>
+
+      <!-- Lightbulb of Ideas (Top Left) -->
+      <g transform="translate(240, 150) rotate(-15)" filter="url(#glowGold)">
+        <circle cx="35" cy="35" r="30" fill="url(#goldGrad)" />
+        <path d="M 25 35 L 45 35 M 35 25 L 35 45" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" />
+      </g>
+    </svg>
+  </div>
+</body>
+</html>

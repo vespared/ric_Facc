@@ -11,12 +11,38 @@
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap"
         rel="stylesheet">
 
+    <script src="xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
+
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="teacher.css">
 </head>
 
 <body class="teacher-body">
     <div class="teacher-shell">
+        <!-- Header di contesto sessione: Studente, Materia, Cartella PC -->
+        <header class="teacher-top-header">
+            <div class="teacher-header-brand">
+                <span class="teacher-logo-badge">RIC_FACC</span>
+                <span class="teacher-role-tag">Pannello Docente</span>
+            </div>
+
+            <div class="teacher-session-context">
+                <div class="context-item context-student">
+                    <span class="context-label">Studente:</span>
+                    <strong id="currentStudentNameDisplay">Martinelli</strong>
+                </div>
+                <div class="context-item context-subject">
+                    <span class="context-label">Materia attiva:</span>
+                    <strong id="currentSubjectNameDisplay">Italiano</strong>
+                </div>
+                <div class="context-item context-folder" title="Percorso cartella sul PC">
+                    <span class="context-label">Cartella risultati:</span>
+                    <code id="currentStudentFolderDisplay">studenti/Martinelli</code>
+                </div>
+            </div>
+        </header>
+
         <section class="teacher-live-bar">
             <article class="teacher-live-pill">
                 <span>Studente</span>
@@ -73,9 +99,68 @@
 
                     <div class="teacher-choice-list" id="teacherChoiceList"></div>
                 </div>
+
+                <!-- Archivio Risultati e Stampe PDF dello Studente -->
+                <div class="quiz-card teacher-archive-card">
+                    <div class="card-topline">
+                        <span class="card-kicker">Cartella Martinelli & Archivio prove</span>
+                        <span class="card-status" id="teacherArchiveStatus">Aggiornato</span>
+                    </div>
+
+                    <div class="archive-header-tools">
+                        <button type="button" id="refreshArchiveBtn" class="action-btn secondary teacher-btn-xs">&#8635; Ricarica elenco</button>
+                        <span class="archive-dir-hint" id="archiveDirHint">Cartella: studenti/Martinelli</span>
+                    </div>
+
+                    <div id="teacherArchiveList" class="teacher-archive-list">
+                        <p class="archive-empty">Nessun quiz salvato finora per Martinelli.</p>
+                    </div>
+                </div>
             </section>
 
             <section class="teacher-column">
+                <!-- Avviso Test Sospeso Precedentemente in Corso -->
+                <div id="teacherSuspendedAlertCard" class="import-card teacher-suspended-card" hidden>
+                    <div class="card-topline">
+                        <span class="card-kicker">&#9888; Test precedentemente in corso</span>
+                        <span class="card-status status-warning">Sessione sospesa</span>
+                    </div>
+                    <div class="suspended-alert-body">
+                        <p class="suspended-alert-text">
+                            È presente un quiz non completato per questo studente. Puoi riprendere da dove era rimasto, ricominciare lo stesso test o iniziarne uno nuovo.
+                        </p>
+                        <div class="suspended-details-grid">
+                            <div class="suspended-detail-pill"><span>Materia</span> <strong id="suspendedSubjectBadge">-</strong></div>
+                            <div class="suspended-detail-pill"><span>Data inizio</span> <strong id="suspendedDateBadge">-</strong></div>
+                            <div class="suspended-detail-pill"><span>Avanzamento</span> <strong id="suspendedProgressBadge">-</strong></div>
+                            <div class="suspended-detail-pill"><span>Punteggio</span> <strong id="suspendedScoreBadge">-</strong></div>
+                        </div>
+                        <div class="teacher-submit-grid suspended-actions-grid">
+                            <button type="button" id="teacherResumeSessionBtn" class="action-btn primary">&#9654; Riprendi test in corso</button>
+                            <button type="button" id="teacherRestartSessionBtn" class="action-btn secondary">&#8635; Rinizia lo stesso test</button>
+                            <button type="button" id="teacherNewSessionBtn" class="action-btn ghost">&#10010; Inizia un nuovo test</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Avviso Test Concluso con Stampa PDF -->
+                <div id="teacherCompletedAlertCard" class="import-card teacher-completed-card" hidden>
+                    <div class="card-topline">
+                        <span class="card-kicker">&#127881; Test completato</span>
+                        <span class="card-status status-success">Risultato salvato</span>
+                    </div>
+                    <div class="completed-alert-body">
+                        <h3 id="completedTestTitle">Quiz completato!</h3>
+                        <p id="completedTestMessage" class="completed-alert-text">
+                            I risultati totali sono stati salvati nella cartella dello studente sul PC.
+                        </p>
+                        <div class="teacher-submit-grid">
+                            <button type="button" id="teacherPrintCompletedBtn" class="action-btn primary">&#128438; Stampa / Salva in PDF</button>
+                            <button type="button" id="teacherDismissCompletedBtn" class="action-btn secondary">Chiudi avviso</button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="control-card">
                     <div class="card-topline">
                         <span class="card-kicker">Controlli remoti</span>
@@ -155,129 +240,174 @@
                     </div>
                 </div>
 
-
+                <!-- Banca Domande per Materia (13 materie predefinite) -->
                 <div class="import-card teacher-subjects-card">
                     <div class="card-topline">
                         <span class="card-kicker">Banca domande per materia</span>
-                        <span class="card-status" id="teacherSubjectsStatus">Seleziona una materia per caricare le domande</span>
+                        <span class="card-status" id="teacherSubjectsStatus">Scegli una materia</span>
                     </div>
 
                     <div class="subject-areas">
                         <div class="subject-area">
                             <span class="subject-area-label">Area linguistica</span>
                             <div class="subject-btn-row">
-                                <button class="action-btn secondary subject-btn" data-subject="Italiano">Italiano</button>
-                                <button class="action-btn secondary subject-btn" data-subject="Inglese">Inglese</button>
-                                <button class="action-btn secondary subject-btn" data-subject="Francese">Francese</button>
+                                <button type="button" class="action-btn secondary subject-btn" data-subject="Italiano">Italiano</button>
+                                <button type="button" class="action-btn secondary subject-btn" data-subject="Inglese">Inglese</button>
+                                <button type="button" class="action-btn secondary subject-btn" data-subject="Francese">Francese</button>
                             </div>
                         </div>
                         <div class="subject-area">
                             <span class="subject-area-label">Area storico-geografica</span>
                             <div class="subject-btn-row">
-                                <button class="action-btn secondary subject-btn" data-subject="Storia">Storia</button>
-                                <button class="action-btn secondary subject-btn" data-subject="Geografia">Geografia</button>
+                                <button type="button" class="action-btn secondary subject-btn" data-subject="Storia">Storia</button>
+                                <button type="button" class="action-btn secondary subject-btn" data-subject="Geografia">Geografia</button>
                             </div>
                         </div>
                         <div class="subject-area">
                             <span class="subject-area-label">Area scientifica</span>
                             <div class="subject-btn-row">
-                                <button class="action-btn secondary subject-btn" data-subject="Matematica">Matematica</button>
-                                <button class="action-btn secondary subject-btn" data-subject="Scienze">Scienze</button>
+                                <button type="button" class="action-btn secondary subject-btn" data-subject="Scienze">Scienze</button>
+                                <button type="button" class="action-btn secondary subject-btn" data-subject="Matematica">Matematica</button>
                             </div>
                         </div>
                         <div class="subject-area">
-                            <span class="subject-area-label">Area artistica ed espressiva</span>
+                            <span class="subject-area-label">Area artistico-espressiva</span>
                             <div class="subject-btn-row">
-                                <button class="action-btn secondary subject-btn" data-subject="Arte">Arte e Immagine</button>
-                                <button class="action-btn secondary subject-btn" data-subject="Musica">Ed. Musicale</button>
+                                <button type="button" class="action-btn secondary subject-btn" data-subject="Arte">Arte e Immagine</button>
+                                <button type="button" class="action-btn secondary subject-btn" data-subject="Musica">Ed. Musicale</button>
                             </div>
                         </div>
                         <div class="subject-area">
-                            <span class="subject-area-label">Area pratica e motoria</span>
+                            <span class="subject-area-label">Altre discipline</span>
                             <div class="subject-btn-row">
-                                <button class="action-btn secondary subject-btn" data-subject="Tecnologia">Tecnologia</button>
-                                <button class="action-btn secondary subject-btn" data-subject="EducazioneFisica">Ed. Fisica</button>
-                            </div>
-                        </div>
-                        <div class="subject-area">
-                            <span class="subject-area-label">Trasversale</span>
-                            <div class="subject-btn-row">
-                                <button class="action-btn secondary subject-btn" data-subject="EducazioneCivica">Ed. Civica</button>
-                            </div>
-                        </div>
-                        <div class="subject-area">
-                            <span class="subject-area-label">Opzionale</span>
-                            <div class="subject-btn-row">
-                                <button class="action-btn secondary subject-btn" data-subject="Religione">Religione Cattolica</button>
+                                <button type="button" class="action-btn secondary subject-btn" data-subject="Tecnologia">Tecnologia</button>
+                                <button type="button" class="action-btn secondary subject-btn" data-subject="EducazioneFisica">Ed. Fisica</button>
+                                <button type="button" class="action-btn secondary subject-btn" data-subject="EducazioneCivica">Ed. Civica</button>
+                                <button type="button" class="action-btn secondary subject-btn" data-subject="Religione">Religione</button>
                             </div>
                         </div>
                     </div>
 
-                    <button id="teacherPublishQuizNowTopBtn" class="action-btn primary teacher-btn-full">&#128227; Pubblica subito quiz</button>
-
-                    <div id="teacherSubjectActions" hidden>
-                        <p id="teacherSubjectPreview" class="teacher-subject-preview"></p>
+                    <div id="teacherSubjectPreviewArea" class="teacher-subject-preview-area" hidden>
+                        <div class="subject-preview-header">
+                            <div>
+                                <strong id="teacherSubjectNameBadge">Italiano</strong>
+                                <span class="subject-preview-count" id="teacherSubjectCountBadge">0 domande pronte</span>
+                            </div>
+                            <button type="button" id="teacherClearSubjectBtn" class="action-btn secondary teacher-btn-xs">Chiudi</button>
+                        </div>
+                        <p id="teacherSubjectPreviewPrompt" class="subject-preview-prompt"></p>
                         <div class="teacher-submit-grid">
-                            <button id="teacherQueueSubjectBtn" class="action-btn secondary teacher-btn-full">Aggiungi in coda</button>
+                            <button type="button" id="teacherPublishSubjectBtn" class="action-btn primary">&#128640; Pubblica subito sul quiz</button>
+                            <button type="button" id="teacherQueueSubjectBtn" class="action-btn secondary">&#10010; Aggiungi in coda</button>
                         </div>
                     </div>
                 </div>
 
-                <div class="import-card teacher-exam-flow-card" id="teacherExamFlowCard" hidden>
+                <!-- Modello di Importazione Domande da File Excel / CSV -->
+                <div class="import-card teacher-excel-card">
                     <div class="card-topline">
-                        <span class="card-kicker">Andamento esame</span>
-                        <span class="card-status" id="teacherExamFlowStatus">In attesa</span>
+                        <span class="card-kicker">Importa domande da Excel</span>
+                        <span class="card-status" id="teacherExcelStatus">Carica file .xlsx o .csv</span>
                     </div>
-                    <p id="teacherExamFlowMessage" class="teacher-exam-flow-message"></p>
-                    <div id="teacherExamFlowActions" class="teacher-exam-flow-actions"></div>
+
+                    <!-- Dropzone interattiva per caricare file Excel o CSV -->
+                    <div class="teacher-dropzone" id="teacherDropzone">
+                        <input type="file" id="teacherExcelFileInput" accept=".xlsx,.xls,.csv" class="teacher-file-input">
+                        <div class="dropzone-content">
+                            <div class="dropzone-icon">📊</div>
+                            <strong class="dropzone-title">Trascina qui il file Excel o clicca per selezionarlo</strong>
+                            <span class="dropzone-subtitle">Supporta file .xlsx, .xls, .csv con domande da 2 a 4 risposte</span>
+                        </div>
+                    </div>
+
+                    <!-- Strumenti per template Excel/CSV -->
+                    <div class="teacher-excel-tools">
+                        <button type="button" id="teacherDownloadXlsxTemplateBtn" class="action-btn secondary teacher-btn-sm">
+                            📥 Modello Excel (.xlsx)
+                        </button>
+                        <button type="button" id="teacherDownloadCsvTemplateBtn" class="action-btn secondary teacher-btn-sm">
+                            📥 Modello CSV (.csv)
+                        </button>
+                    </div>
+
+                    <!-- Anteprima domande caricate da Excel -->
+                    <div id="teacherExcelPreviewArea" class="teacher-excel-preview-area" hidden>
+                        <div class="excel-preview-header">
+                            <div class="excel-preview-meta">
+                                <strong id="teacherExcelFileName">file.xlsx</strong>
+                                <span class="excel-preview-count" id="teacherExcelQuestionCount">0 domande pronte</span>
+                            </div>
+                            <button type="button" id="teacherClearExcelBtn" class="action-btn secondary teacher-btn-xs">Rimuovi</button>
+                        </div>
+
+                        <div class="excel-preview-stats" id="teacherExcelStatsBadge"></div>
+                        <div class="excel-preview-list" id="teacherExcelPreviewList"></div>
+
+                        <div class="teacher-submit-grid">
+                            <button id="teacherPublishExcelBtn" class="action-btn primary">🚀 Pubblica subito sul quiz</button>
+                            <button id="teacherQueueExcelBtn" class="action-btn secondary">➕ Aggiungi in coda</button>
+                        </div>
+                    </div>
                 </div>
 
+                <!-- Immissione Domanda Singola Live (aggiornata per 2, 3 o 4 risposte) -->
                 <div class="import-card teacher-compose-card">
                     <div class="card-topline">
                         <span class="card-kicker">Nuova domanda live</span>
-                        <span class="card-status">Invio istantaneo dal tablet</span>
+                        <span class="card-status" id="teacherComposeStatus">Invio istantaneo dal tablet</span>
+                    </div>
+
+                    <!-- Selettore rapido numero risposte -->
+                    <div class="option-count-bar">
+                        <span class="option-count-label">Scelte possibili:</span>
+                        <div class="option-count-pills">
+                            <button type="button" class="count-pill" data-count="2">2 Risposte (A, B)</button>
+                            <button type="button" class="count-pill" data-count="3">3 Risposte (A, B, C)</button>
+                            <button type="button" class="count-pill is-active" data-count="4">4 Risposte (A, B, C, D)</button>
+                        </div>
                     </div>
 
                     <div class="teacher-form-grid">
                         <label class="teacher-field">
-                            <span>Titolo</span>
-                            <input id="teacherQuestionTitleInput" type="text" placeholder="Es. Domanda bonus">
-                        </label>
-
-                        <label class="teacher-field teacher-field-full">
-                            <span>Testo domanda</span>
-                            <textarea id="teacherQuestionPromptInput" rows="4"
-                                placeholder="Scrivi qui la domanda a scelta multipla"></textarea>
+                            <span>Titolo (facoltativo)</span>
+                            <input id="teacherQuestionTitleInput" type="text" placeholder="Es. Domanda 1">
                         </label>
 
                         <label class="teacher-field">
-                            <span>Risposta A</span>
-                            <input id="teacherOptionAInput" type="text" placeholder="Prima risposta">
-                        </label>
-
-                        <label class="teacher-field">
-                            <span>Risposta B</span>
-                            <input id="teacherOptionBInput" type="text" placeholder="Seconda risposta">
-                        </label>
-
-                        <label class="teacher-field">
-                            <span>Risposta C</span>
-                            <input id="teacherOptionCInput" type="text" placeholder="Terza risposta">
-                        </label>
-
-                        <label class="teacher-field">
-                            <span>Risposta D</span>
-                            <input id="teacherOptionDInput" type="text" placeholder="Quarta risposta">
-                        </label>
-
-                        <label class="teacher-field">
-                            <span>Risposta corretta</span>
+                            <span>Risposta esatta</span>
                             <select id="teacherCorrectAnswerInput">
                                 <option value="0">A</option>
                                 <option value="1">B</option>
                                 <option value="2">C</option>
                                 <option value="3">D</option>
                             </select>
+                        </label>
+
+                        <label class="teacher-field teacher-field-full">
+                            <span>Testo domanda *</span>
+                            <textarea id="teacherQuestionPromptInput" rows="3"
+                                placeholder="Scrivi qui la domanda da inviare allo studente"></textarea>
+                        </label>
+
+                        <label class="teacher-field" id="teacherFieldA">
+                            <span>Risposta A *</span>
+                            <input id="teacherOptionAInput" type="text" placeholder="Prima risposta">
+                        </label>
+
+                        <label class="teacher-field" id="teacherFieldB">
+                            <span>Risposta B *</span>
+                            <input id="teacherOptionBInput" type="text" placeholder="Seconda risposta">
+                        </label>
+
+                        <label class="teacher-field" id="teacherFieldC">
+                            <span>Risposta C <small>(facoltativa per 2 scelte)</small></span>
+                            <input id="teacherOptionCInput" type="text" placeholder="Terza risposta">
+                        </label>
+
+                        <label class="teacher-field" id="teacherFieldD">
+                            <span>Risposta D <small>(facoltativa per 2 o 3 scelte)</small></span>
+                            <input id="teacherOptionDInput" type="text" placeholder="Quarta risposta">
                         </label>
                     </div>
 

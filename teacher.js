@@ -64,6 +64,65 @@ const teacherCorrectAnswerInput = document.getElementById('teacherCorrectAnswerI
 let snapshotTimer = null;
 let lastSentCommandId = 0;
 
+// Header studente e materia
+const currentStudentNameDisplay = document.getElementById('currentStudentNameDisplay');
+const currentSubjectNameDisplay = document.getElementById('currentSubjectNameDisplay');
+const currentStudentFolderDisplay = document.getElementById('currentStudentFolderDisplay');
+const changeStudentBtn = document.getElementById('changeStudentBtn');
+
+// Alert test sospeso
+const teacherSuspendedAlertCard = document.getElementById('teacherSuspendedAlertCard');
+const suspendedSubjectBadge = document.getElementById('suspendedSubjectBadge');
+const suspendedDateBadge = document.getElementById('suspendedDateBadge');
+const suspendedProgressBadge = document.getElementById('suspendedProgressBadge');
+const suspendedScoreBadge = document.getElementById('suspendedScoreBadge');
+const teacherResumeSessionBtn = document.getElementById('teacherResumeSessionBtn');
+const teacherRestartSessionBtn = document.getElementById('teacherRestartSessionBtn');
+const teacherNewSessionBtn = document.getElementById('teacherNewSessionBtn');
+
+// Alert test completato
+const teacherCompletedAlertCard = document.getElementById('teacherCompletedAlertCard');
+const completedTestTitle = document.getElementById('completedTestTitle');
+const completedTestMessage = document.getElementById('completedTestMessage');
+const teacherPrintCompletedBtn = document.getElementById('teacherPrintCompletedBtn');
+const teacherDismissCompletedBtn = document.getElementById('teacherDismissCompletedBtn');
+
+// Archivio risultati
+const teacherArchiveCard = document.getElementById('teacherArchiveCard');
+const teacherArchiveStatus = document.getElementById('teacherArchiveStatus');
+const refreshArchiveBtn = document.getElementById('refreshArchiveBtn');
+const archiveDirHint = document.getElementById('archiveDirHint');
+const teacherArchiveList = document.getElementById('teacherArchiveList');
+
+// Banca materie
+const teacherSubjectsCard = document.getElementById('teacherSubjectsCard');
+const teacherSubjectsStatus = document.getElementById('teacherSubjectsStatus');
+const teacherSubjectButtons = document.querySelectorAll('.subject-btn');
+const teacherSubjectPreviewArea = document.getElementById('teacherSubjectPreviewArea');
+const teacherSubjectNameBadge = document.getElementById('teacherSubjectNameBadge');
+const teacherSubjectCountBadge = document.getElementById('teacherSubjectCountBadge');
+const teacherSubjectPreviewPrompt = document.getElementById('teacherSubjectPreviewPrompt');
+const teacherPublishSubjectBtn = document.getElementById('teacherPublishSubjectBtn');
+const teacherQueueSubjectBtn = document.getElementById('teacherQueueSubjectBtn');
+const teacherClearSubjectBtn = document.getElementById('teacherClearSubjectBtn');
+
+let currentActiveStudent = 'Martinelli';
+let currentActiveSubject = 'Italiano';
+let activeSuspendedSession = null;
+let activeCompletedResult = null;
+let selectedSubjectQuestions = null;
+let selectedSubjectName = null;
+
+function escapeTeacherHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function getCommandLabel(type) {
     switch (type) {
         case 'start-camera':
@@ -90,6 +149,16 @@ function getCommandLabel(type) {
             return 'Ripeti domanda';
         case 'next-question':
             return 'Domanda successiva';
+        case 'resume-session':
+            return 'Riprendi test sospeso';
+        case 'restart-session':
+            return 'Rinizia test dall\'inizio';
+        case 'new-session':
+            return 'Nuovo test';
+        case 'set-student':
+            return 'Imposta studente';
+        case 'set-subject':
+            return 'Imposta materia';
         default:
             return type || 'Comando remoto';
     }
@@ -105,12 +174,19 @@ function resolveCorrectIndex(value, options, questionIndex) {
         }
     }
 
-    const normalized = String(value || '').trim();
+    const normalized = String(value ?? '').trim();
+    if (!normalized) {
+        return null;
+    }
+
     const upper = normalized.toUpperCase();
     const numeric = Number.parseInt(normalized, 10);
 
     if (OPTION_LETTERS.includes(upper)) {
-        return OPTION_LETTERS.indexOf(upper);
+        const idx = OPTION_LETTERS.indexOf(upper);
+        if (idx < options.length) {
+            return idx;
+        }
     }
 
     if (!Number.isNaN(numeric)) {
@@ -127,29 +203,67 @@ function resolveCorrectIndex(value, options, questionIndex) {
         return matchedByText;
     }
 
-    throw new Error(`Domanda ${questionIndex + 1}: risposta corretta non valida.`);
+    throw new Error(`Domanda ${questionIndex + 1}: risposta corretta "${value}" non valida per ${options.length} opzioni.`);
+}
+
+function normalizeHeader(value) {
+    return String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+}
+
+function splitCsvLine(line) {
+    const values = [];
+    let current = '';
+    let insideQuotes = false;
+
+    for (let index = 0; index < line.length; index += 1) {
+        const char = line[index];
+        const nextChar = line[index + 1];
+
+        if (char === '"') {
+            if (insideQuotes && nextChar === '"') {
+                current += '"';
+                index += 1;
+            } else {
+                insideQuotes = !insideQuotes;
+            }
+        } else if (char === ',' && !insideQuotes) {
+            values.push(current.trim());
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+
+    values.push(current.trim());
+    return values;
 }
 
 function normalizeQuestion(rawQuestion, index) {
-    const title = String(rawQuestion.title || `Domanda ${index + 1}`).trim();
-    const prompt = String(rawQuestion.prompt || rawQuestion.question || rawQuestion.domanda || '').trim();
-    const options = Array.isArray(rawQuestion.options)
-        ? rawQuestion.options.map((option) => String(option || '').trim())
-        : [rawQuestion.optionA || rawQuestion.a, rawQuestion.optionB || rawQuestion.b, rawQuestion.optionC || rawQuestion.c, rawQuestion.optionD || rawQuestion.d]
-            .map((option) => String(option || '').trim());
+    const title = String(rawQuestion.title || rawQuestion.titolo || `Domanda ${index + 1}`).trim();
+    const prompt = String(rawQuestion.prompt || rawQuestion.question || rawQuestion.domanda || rawQuestion.testo || rawQuestion.testodomanda || rawQuestion.quesito || '').trim();
+    
+    let rawOpts = Array.isArray(rawQuestion.options)
+        ? rawQuestion.options
+        : [
+            rawQuestion.optionA || rawQuestion.opzioneA || rawQuestion.rispostaA || rawQuestion.a || rawQuestion.opzione1 || rawQuestion.risposta1,
+            rawQuestion.optionB || rawQuestion.opzioneB || rawQuestion.rispostaB || rawQuestion.b || rawQuestion.opzione2 || rawQuestion.risposta2,
+            rawQuestion.optionC || rawQuestion.opzioneC || rawQuestion.rispostaC || rawQuestion.c || rawQuestion.opzione3 || rawQuestion.risposta3,
+            rawQuestion.optionD || rawQuestion.opzioneD || rawQuestion.rispostaD || rawQuestion.d || rawQuestion.opzione4 || rawQuestion.risposta4
+        ];
 
-    // Scarta le opzioni vuote in coda: cosi sono ammesse le domande con sole 2 risposte
-    // (C e D assenti) oltre a quelle classiche con 4 opzioni.
-    while (options.length > 0 && !options[options.length - 1]) {
-        options.pop();
-    }
+    const options = rawOpts
+        .map((option) => String(option ?? '').trim())
+        .filter(Boolean);
 
     if (!prompt) {
         throw new Error(`Domanda ${index + 1}: testo domanda mancante.`);
     }
 
-    if (options.length < 2 || options.length > 4 || options.some((option) => !option)) {
-        throw new Error(`Domanda ${index + 1}: servono da 2 a 4 opzioni compilate.`);
+    if (options.length < 2 || options.length > 4) {
+        throw new Error(`Domanda ${index + 1}: servono da 2 a 4 risposte compilate (trovate ${options.length}).`);
     }
 
     return {
@@ -157,11 +271,96 @@ function normalizeQuestion(rawQuestion, index) {
         prompt,
         options,
         correctIndex: resolveCorrectIndex(
-            rawQuestion.correctIndex ?? rawQuestion.correct ?? rawQuestion.corretta ?? rawQuestion.answer ?? rawQuestion.risposta,
+            rawQuestion.correctIndex ?? rawQuestion.correct ?? rawQuestion.corretta ?? rawQuestion.rispostaesatta ?? rawQuestion.rispostacorretta ?? rawQuestion.esatta ?? rawQuestion.answer ?? rawQuestion.risposta ?? rawQuestion.soluzione,
             options,
             index
         )
     };
+}
+
+function mapRowToQuestion(row, rowIndex) {
+    const normalizedRow = Object.entries(row).reduce((accumulator, [key, value]) => {
+        accumulator[normalizeHeader(key)] = value;
+        return accumulator;
+    }, {});
+
+    const title = normalizedRow.title || normalizedRow.titolo || `Domanda ${rowIndex + 1}`;
+    const prompt = normalizedRow.prompt || normalizedRow.question || normalizedRow.domanda || normalizedRow.testo || normalizedRow.testodomanda || normalizedRow.quesito;
+    const optA = normalizedRow.optiona || normalizedRow.opzionea || normalizedRow.rispostaa || normalizedRow.a || normalizedRow.opzione1 || normalizedRow.risposta1 || '';
+    const optB = normalizedRow.optionb || normalizedRow.opzioneb || normalizedRow.rispostab || normalizedRow.b || normalizedRow.opzione2 || normalizedRow.risposta2 || '';
+    const optC = normalizedRow.optionc || normalizedRow.opzionec || normalizedRow.rispostac || normalizedRow.c || normalizedRow.opzione3 || normalizedRow.risposta3 || '';
+    const optD = normalizedRow.optiond || normalizedRow.opzioned || normalizedRow.rispostad || normalizedRow.d || normalizedRow.opzione4 || normalizedRow.risposta4 || '';
+    const correct = normalizedRow.correct ?? normalizedRow.corretta ?? normalizedRow.rispostaesatta ?? normalizedRow.rispostacorretta ?? normalizedRow.esatta ?? normalizedRow.answer ?? normalizedRow.risposta ?? normalizedRow.soluzione ?? normalizedRow.chiave;
+
+    const rawOptions = [optA, optB, optC, optD]
+        .map((opt) => String(opt || '').trim())
+        .filter(Boolean);
+
+    return normalizeQuestion({
+        title,
+        prompt,
+        options: rawOptions,
+        correct
+    }, rowIndex);
+}
+
+function parseCsvQuestions(text) {
+    const rows = text
+        .replace(/^\uFEFF/, '')
+        .split(/\r?\n/)
+        .filter((line) => line.trim() !== '');
+
+    if (rows.length < 2) {
+        throw new Error('Il CSV deve contenere intestazione e almeno una domanda.');
+    }
+
+    const headers = splitCsvLine(rows[0]).map(normalizeHeader);
+    const findColumn = (variants) => headers.findIndex((header) => variants.includes(header));
+
+    const titleIndex = findColumn(['title', 'titolo']);
+    const promptIndex = findColumn(['prompt', 'question', 'domanda', 'testo', 'testodomanda', 'quesito']);
+    const optionAIndex = findColumn(['optiona', 'opzionea', 'rispostaa', 'a', 'opzione1', 'risposta1']);
+    const optionBIndex = findColumn(['optionb', 'opzioneb', 'rispostab', 'b', 'opzione2', 'risposta2']);
+    const optionCIndex = findColumn(['optionc', 'opzionec', 'rispostac', 'c', 'opzione3', 'risposta3']);
+    const optionDIndex = findColumn(['optiond', 'opzioned', 'rispostad', 'd', 'opzione4', 'risposta4']);
+    const correctIndex = findColumn(['correct', 'corretta', 'rispostaesatta', 'rispostacorretta', 'esatta', 'answer', 'risposta', 'soluzione', 'chiave']);
+
+    if (promptIndex < 0 || optionAIndex < 0 || optionBIndex < 0) {
+        throw new Error('Il CSV deve contenere almeno le colonne: Domanda, Risposta A, Risposta B.');
+    }
+
+    return rows.slice(1).map((line, rowIndex) => {
+        const columns = splitCsvLine(line);
+        const optA = optionAIndex >= 0 ? columns[optionAIndex] : '';
+        const optB = optionBIndex >= 0 ? columns[optionBIndex] : '';
+        const optC = optionCIndex >= 0 ? columns[optionCIndex] : '';
+        const optD = optionDIndex >= 0 ? columns[optionDIndex] : '';
+        const rawOptions = [optA, optB, optC, optD].map((opt) => String(opt || '').trim()).filter(Boolean);
+
+        return normalizeQuestion({
+            title: titleIndex >= 0 && columns[titleIndex] ? columns[titleIndex] : `Domanda ${rowIndex + 1}`,
+            prompt: columns[promptIndex],
+            options: rawOptions,
+            correct: correctIndex >= 0 ? columns[correctIndex] : null
+        }, rowIndex);
+    });
+}
+
+function parseXlsxQuestions(arrayBuffer) {
+    if (typeof XLSX === 'undefined') {
+        throw new Error('Libreria Excel non ancora caricata nel browser.');
+    }
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const firstSheetName = workbook.SheetNames[0];
+    if (!firstSheetName) {
+        throw new Error('Il file Excel non contiene fogli leggibili.');
+    }
+    const sheet = workbook.Sheets[firstSheetName];
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    if (!rows.length) {
+        throw new Error('Il file Excel non contiene righe con domande.');
+    }
+    return rows.map((row, index) => mapRowToQuestion(row, index));
 }
 
 function escapeHtml(value) {
@@ -197,7 +396,15 @@ async function fetchJson(path, options = {}) {
     }
 
     const text = await response.text();
-    const payload = text ? JSON.parse(text) : {};
+    let payload = {};
+    try {
+        payload = text ? JSON.parse(text) : {};
+    } catch (e) {
+        if (!response.ok) {
+            throw new Error(text || `Richiesta non riuscita (${response.status}).`);
+        }
+        throw new Error('Risposta del server non valida.');
+    }
 
     if (!response.ok) {
         throw new Error(payload.error || `Richiesta non riuscita (${response.status}).`);
@@ -539,15 +746,50 @@ function renderSnapshot(snapshot, commandAck = null) {
     studentStateStatus.textContent = snapshot.currentState || '-';
     studentCounterStatus.textContent = snapshot.questionCounterLabel || '-';
 
+    if (snapshot.quizSession) {
+        if (snapshot.quizSession.student && currentStudentNameDisplay) {
+            currentStudentNameDisplay.textContent = snapshot.quizSession.student;
+            currentActiveStudent = snapshot.quizSession.student;
+        }
+        if (snapshot.quizSession.subject && currentSubjectNameDisplay) {
+            currentSubjectNameDisplay.textContent = snapshot.quizSession.subject;
+            currentActiveSubject = snapshot.quizSession.subject;
+        }
+        if (currentStudentFolderDisplay) {
+            currentStudentFolderDisplay.textContent = `studenti/${currentActiveStudent}`;
+        }
+    }
+
     if (snapshot.currentQuestion) {
         teacherQuestionTitle.textContent = snapshot.currentQuestion.title;
         teacherQuestionPrompt.textContent = snapshot.currentQuestion.prompt;
     } else if (snapshot.simulationCompleted) {
         teacherQuestionTitle.textContent = 'Test completato';
-        teacherQuestionPrompt.textContent = 'Il ragazzo ha concluso il quiz attuale.';
+        teacherQuestionPrompt.textContent = 'Lo studente ha completato tutte le domande del quiz.';
     } else {
         teacherQuestionTitle.textContent = 'Quiz non ancora pronto';
         teacherQuestionPrompt.textContent = 'In attesa di una domanda attiva dal PC.';
+    }
+
+    if (snapshot.simulationCompleted) {
+        const session = snapshot.quizSession || {};
+        activeCompletedResult = {
+            student: session.student || currentActiveStudent,
+            subject: session.subject || currentActiveSubject,
+            score: session.score || {},
+            fileName: session.fileName || null
+        };
+        if (completedTestTitle) {
+            completedTestTitle.textContent = `Quiz di ${activeCompletedResult.subject} completato!`;
+        }
+        if (completedTestMessage) {
+            const pct = activeCompletedResult.score?.percentuale ?? 0;
+            const esatte = activeCompletedResult.score?.esatte ?? 0;
+            const errate = activeCompletedResult.score?.errate ?? 0;
+            const total = snapshot.questionCount || (esatte + errate);
+            completedTestMessage.textContent = `Lo studente ${activeCompletedResult.student} ha concluso il test con punteggio ${pct}% (${esatte} risposte esatte, ${errate} errate su ${total} domande).`;
+        }
+        if (teacherCompletedAlertCard) teacherCompletedAlertCard.hidden = false;
     }
 
     setMetric(teacherLeftEar, snapshot.metrics && snapshot.metrics.leftEar);
@@ -558,7 +800,6 @@ function renderSnapshot(snapshot, commandAck = null) {
     renderChoices(snapshot);
     renderEvents(snapshot);
     renderFraming(snapshot.framing || null);
-    processExamFlow(snapshot);
 }
 
 function renderDisconnectedState(message) {
@@ -615,28 +856,81 @@ async function sendCommand(type, payload = {}) {
     }
 }
 
+// --- Gestione Scelte Domanda Singola Live (2, 3 o 4 opzioni) ---
+let currentComposeOptionCount = 4;
+const teacherFieldC = document.getElementById('teacherFieldC');
+const teacherFieldD = document.getElementById('teacherFieldD');
+const countPills = document.querySelectorAll('.count-pill');
+
+function updateComposeOptionCount(count) {
+    currentComposeOptionCount = count;
+    countPills.forEach((pill) => {
+        pill.classList.toggle('is-active', Number(pill.dataset.count) === count);
+    });
+
+    if (teacherFieldC) {
+        teacherFieldC.style.display = count >= 3 ? '' : 'none';
+        if (count < 3 && teacherOptionCInput) teacherOptionCInput.value = '';
+    }
+    if (teacherFieldD) {
+        teacherFieldD.style.display = count >= 4 ? '' : 'none';
+        if (count < 4 && teacherOptionDInput) teacherOptionDInput.value = '';
+    }
+
+    // Aggiorna opzioni nel select della risposta esatta
+    if (teacherCorrectAnswerInput) {
+        const previousVal = Number(teacherCorrectAnswerInput.value);
+        teacherCorrectAnswerInput.innerHTML = '';
+        for (let i = 0; i < count; i++) {
+            const opt = document.createElement('option');
+            opt.value = String(i);
+            opt.textContent = OPTION_LETTERS[i];
+            teacherCorrectAnswerInput.appendChild(opt);
+        }
+        teacherCorrectAnswerInput.value = previousVal < count ? String(previousVal) : '0';
+    }
+}
+
+countPills.forEach((pill) => {
+    pill.addEventListener('click', () => {
+        const count = Number(pill.dataset.count) || 4;
+        updateComposeOptionCount(count);
+    });
+});
+
+updateComposeOptionCount(4);
+
 function buildQuestionPayload() {
     const prompt = teacherQuestionPromptInput.value.trim();
-    const options = [
+    const count = currentComposeOptionCount;
+    const title = teacherQuestionTitleInput.value.trim() || 'Domanda live';
+    
+    const allOptions = [
         teacherOptionAInput.value.trim(),
         teacherOptionBInput.value.trim(),
-        teacherOptionCInput.value.trim(),
-        teacherOptionDInput.value.trim()
+        teacherOptionCInput ? teacherOptionCInput.value.trim() : '',
+        teacherOptionDInput ? teacherOptionDInput.value.trim() : ''
     ];
+    const options = allOptions.slice(0, count);
 
     if (!prompt) {
         throw new Error('Inserisci il testo della domanda.');
     }
 
     if (options.some((option) => !option)) {
-        throw new Error('Compila tutte e quattro le risposte.');
+        throw new Error(`Compila tutte le ${count} risposte richieste.`);
+    }
+
+    const selectedIdx = Number(teacherCorrectAnswerInput.value);
+    if (selectedIdx < 0 || selectedIdx >= count) {
+        throw new Error('Seleziona una risposta corretta valida per il numero di scelte.');
     }
 
     return {
-        title: teacherQuestionTitleInput.value.trim(),
+        title,
         prompt,
         options,
-        correctIndex: Number(teacherCorrectAnswerInput.value)
+        correctIndex: selectedIdx
     };
 }
 
@@ -645,9 +939,9 @@ function clearQuestionForm() {
     teacherQuestionPromptInput.value = '';
     teacherOptionAInput.value = '';
     teacherOptionBInput.value = '';
-    teacherOptionCInput.value = '';
-    teacherOptionDInput.value = '';
-    teacherCorrectAnswerInput.value = '0';
+    if (teacherOptionCInput) teacherOptionCInput.value = '';
+    if (teacherOptionDInput) teacherOptionDInput.value = '';
+    if (teacherCorrectAnswerInput) teacherCorrectAnswerInput.value = '0';
 }
 
 async function sendQuestionCommand(commandType) {
@@ -655,14 +949,12 @@ async function sendQuestionCommand(commandType) {
         const question = buildQuestionPayload();
         await sendCommand(commandType, { question });
         clearQuestionForm();
-        if (typeof hideExamFlowPanel === 'function') {
-            hideExamFlowPanel();
-        }
+        setActionStatus(`Domanda "${question.title}" (${question.options.length} scelte) inviata al quiz.`);
     } catch (error) {
         setActionStatus(error.message, true);
+        alert(`Attenzione: ${error.message}`);
     }
 }
-
 
 teacherStartCameraBtn.addEventListener('click', () => {
     void sendCommand('start-camera');
@@ -700,13 +992,11 @@ teacherResetBtn.addEventListener('click', () => {
     void sendCommand('reset-flow');
 });
 
-
 if (teacherFramingBtn) {
     teacherFramingBtn.addEventListener('click', () => {
         setFramingVisible(!framingVisible);
     });
 }
-
 
 teacherPublishNowBtn.addEventListener('click', () => {
     void sendQuestionCommand('publish-now');
@@ -716,264 +1006,543 @@ teacherQueueNextBtn.addEventListener('click', () => {
     void sendQuestionCommand('queue-next');
 });
 
+// --- Gestione Importazione Domande da Excel / CSV ---
+const teacherExcelStatus = document.getElementById('teacherExcelStatus');
+const teacherDropzone = document.getElementById('teacherDropzone');
+const teacherExcelFileInput = document.getElementById('teacherExcelFileInput');
+const teacherDownloadXlsxTemplateBtn = document.getElementById('teacherDownloadXlsxTemplateBtn');
+const teacherDownloadCsvTemplateBtn = document.getElementById('teacherDownloadCsvTemplateBtn');
+const teacherExcelPreviewArea = document.getElementById('teacherExcelPreviewArea');
+const teacherExcelFileName = document.getElementById('teacherExcelFileName');
+const teacherExcelQuestionCount = document.getElementById('teacherExcelQuestionCount');
+const teacherExcelStatsBadge = document.getElementById('teacherExcelStatsBadge');
+const teacherExcelPreviewList = document.getElementById('teacherExcelPreviewList');
+const teacherPublishExcelBtn = document.getElementById('teacherPublishExcelBtn');
+const teacherQueueExcelBtn = document.getElementById('teacherQueueExcelBtn');
+const teacherClearExcelBtn = document.getElementById('teacherClearExcelBtn');
+
+let loadedExcelQuestions = null;
+let loadedExcelFileName = '';
+
+function setExcelStatus(message, isError = false) {
+    if (!teacherExcelStatus) return;
+    teacherExcelStatus.textContent = message;
+    teacherExcelStatus.style.color = isError ? 'var(--red)' : 'var(--muted)';
+}
+
+function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.setTimeout(() => URL.revokeObjectURL(url), 600);
+}
+
+function downloadXlsxTemplate() {
+    if (typeof XLSX === 'undefined') {
+        alert('Libreria Excel in caricamento. Prova tra qualche istante o scarica il modello CSV.');
+        return;
+    }
+
+    const rows = [
+        {
+            "Titolo": "Esempio 4 Scelte",
+            "Domanda": "Quale pianeta del nostro sistema solare e conosciuto come il Pianeta Rosso?",
+            "Risposta A": "Marte",
+            "Risposta B": "Giove",
+            "Risposta C": "Venere",
+            "Risposta D": "Nettuno",
+            "Risposta Esatta": "A"
+        },
+        {
+            "Titolo": "Esempio 3 Scelte",
+            "Domanda": "Quale fra questi e uno stato fisico fondamentale della materia?",
+            "Risposta A": "Solido",
+            "Risposta B": "Elettrico",
+            "Risposta C": "Magnetico",
+            "Risposta D": "",
+            "Risposta Esatta": "A"
+        },
+        {
+            "Titolo": "Esempio 2 Scelte (Vero/Falso)",
+            "Domanda": "Il Sole e una stella situata al centro del nostro sistema planetario?",
+            "Risposta A": "Vero",
+            "Risposta B": "Falso",
+            "Risposta C": "",
+            "Risposta D": "",
+            "Risposta Esatta": "A"
+        }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    worksheet['!cols'] = [
+        { wch: 22 },
+        { wch: 48 },
+        { wch: 20 },
+        { wch: 20 },
+        { wch: 20 },
+        { wch: 20 },
+        { wch: 16 }
+    ];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Domande Quiz");
+    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    downloadBlob(blob, 'modello-domande-quiz.xlsx');
+    setExcelStatus('Modello Excel (.xlsx) scaricato');
+}
+
+function downloadCsvTemplate() {
+    const csvContent = [
+        'Titolo,Domanda,Risposta A,Risposta B,Risposta C,Risposta D,Risposta Esatta',
+        '"Esempio 4 Scelte","Quale pianeta del nostro sistema solare e conosciuto come il Pianeta Rosso?","Marte","Giove","Venere","Nettuno","A"',
+        '"Esempio 3 Scelte","Quale fra questi e uno stato fisico fondamentale della materia?","Solido","Elettrico","Magnetico","","A"',
+        '"Esempio 2 Scelte (Vero/Falso)","Il Sole e una stella situata al centro del nostro sistema planetario?","Vero","Falso","","","A"'
+    ].join('\r\n');
+
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' });
+    downloadBlob(blob, 'modello-domande-quiz.csv');
+    setExcelStatus('Modello CSV (.csv) scaricato');
+}
+
+if (teacherDownloadXlsxTemplateBtn) {
+    teacherDownloadXlsxTemplateBtn.addEventListener('click', downloadXlsxTemplate);
+}
+if (teacherDownloadCsvTemplateBtn) {
+    teacherDownloadCsvTemplateBtn.addEventListener('click', downloadCsvTemplate);
+}
+
+function clearLoadedExcel() {
+    loadedExcelQuestions = null;
+    loadedExcelFileName = '';
+    if (teacherExcelFileInput) teacherExcelFileInput.value = '';
+    if (teacherExcelPreviewArea) teacherExcelPreviewArea.hidden = true;
+    if (teacherDropzone) teacherDropzone.hidden = false;
+    setExcelStatus('Carica file .xlsx o .csv');
+}
+
+if (teacherClearExcelBtn) {
+    teacherClearExcelBtn.addEventListener('click', clearLoadedExcel);
+}
+
+function renderExcelPreview(questions, fileName) {
+    loadedExcelQuestions = questions;
+    loadedExcelFileName = fileName;
+
+    if (teacherExcelFileName) teacherExcelFileName.textContent = fileName;
+    if (teacherExcelQuestionCount) {
+        teacherExcelQuestionCount.textContent = `${questions.length} ${questions.length === 1 ? 'domanda' : 'domande'} pronte`;
+    }
+
+    const count2 = questions.filter(q => q.options.length === 2).length;
+    const count3 = questions.filter(q => q.options.length === 3).length;
+    const count4 = questions.filter(q => q.options.length === 4).length;
+
+    if (teacherExcelStatsBadge) {
+        const badges = [];
+        if (count4 > 0) badges.push(`<span class="badge-opt count-4">${count4} a 4 risposte</span>`);
+        if (count3 > 0) badges.push(`<span class="badge-opt count-3">${count3} a 3 risposte</span>`);
+        if (count2 > 0) badges.push(`<span class="badge-opt count-2">${count2} a 2 risposte</span>`);
+        teacherExcelStatsBadge.innerHTML = badges.join('');
+    }
+
+    if (teacherExcelPreviewList) {
+        teacherExcelPreviewList.innerHTML = questions.map((q, idx) => `
+            <div class="excel-preview-card">
+                <div class="excel-preview-card-head">
+                    <span class="excel-preview-card-idx">#${idx + 1}</span>
+                    <strong class="excel-preview-card-title">${escapeHtml(q.title)}</strong>
+                    <span class="excel-preview-card-badge">${q.options.length} scelte</span>
+                </div>
+                <p class="excel-preview-card-prompt">${escapeHtml(q.prompt)}</p>
+                <div class="excel-preview-card-options">
+                    ${q.options.map((opt, optIdx) => {
+                        const isCorrect = q.correctIndex === optIdx;
+                        return `<span class="preview-opt-item ${isCorrect ? 'is-correct' : ''}">
+                            <strong>${OPTION_LETTERS[optIdx]}</strong> ${escapeHtml(opt)} ${isCorrect ? '✓' : ''}
+                        </span>`;
+                    }).join('')}
+                </div>
+            </div>
+        `).join('');
+    }
+
+    if (teacherDropzone) teacherDropzone.hidden = true;
+    if (teacherExcelPreviewArea) teacherExcelPreviewArea.hidden = false;
+    setExcelStatus(`${fileName}: ${questions.length} domande lette con successo!`);
+}
+
+async function handleExcelFile(file) {
+    if (!file) return;
+    const extension = String(file.name.split('.').pop() || '').toLowerCase();
+    setExcelStatus(`Elaborazione ${file.name} in corso...`);
+
+    try {
+        let questions;
+        if (extension === 'csv') {
+            const text = await file.text();
+            questions = parseCsvQuestions(text);
+        } else if (extension === 'xlsx' || extension === 'xls') {
+            const buffer = await file.arrayBuffer();
+            questions = parseXlsxQuestions(buffer);
+        } else {
+            throw new Error('Formato non supportato. Carica un file .xlsx, .xls o .csv.');
+        }
+
+        if (!Array.isArray(questions) || questions.length === 0) {
+            throw new Error('Nessuna domanda valida trovata nel file.');
+        }
+
+        renderExcelPreview(questions, file.name);
+    } catch (error) {
+        console.error('Errore parsing Excel:', error);
+        setExcelStatus(`Errore: ${error.message}`, true);
+        alert(`Errore file Excel: ${error.message}`);
+    }
+}
+
+if (teacherExcelFileInput) {
+    teacherExcelFileInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) handleExcelFile(file);
+    });
+}
+
+if (teacherDropzone) {
+    teacherDropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        teacherDropzone.classList.add('is-dragover');
+    });
+    teacherDropzone.addEventListener('dragleave', () => {
+        teacherDropzone.classList.remove('is-dragover');
+    });
+    teacherDropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        teacherDropzone.classList.remove('is-dragover');
+        const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (file) handleExcelFile(file);
+    });
+}
+
+// Pulsanti invio comandi da file Excel
+if (teacherPublishExcelBtn) {
+    teacherPublishExcelBtn.addEventListener('click', async () => {
+        if (!loadedExcelQuestions || loadedExcelQuestions.length === 0) {
+            setExcelStatus('Nessun file con domande caricato.', true);
+            return;
+        }
+        try {
+            await sendCommand('publish-batch', { questions: loadedExcelQuestions });
+            const count = loadedExcelQuestions.length;
+            setExcelStatus(`Pubblicate ${count} domande sul quiz dal file ${loadedExcelFileName}!`);
+            setActionStatus(`Quiz avviato con ${count} domande caricate da Excel.`);
+        } catch (error) {
+            setExcelStatus(`Errore invio: ${error.message}`, true);
+        }
+    });
+}
+
+if (teacherQueueExcelBtn) {
+    teacherQueueExcelBtn.addEventListener('click', async () => {
+        if (!loadedExcelQuestions || loadedExcelQuestions.length === 0) {
+            setExcelStatus('Nessun file con domande caricato.', true);
+            return;
+        }
+        try {
+            await sendCommand('queue-batch', { questions: loadedExcelQuestions });
+            const count = loadedExcelQuestions.length;
+            setExcelStatus(`Aggiunte ${count} domande in coda dal file ${loadedExcelFileName}.`);
+            setActionStatus(`${count} domande aggiunte in coda sul quiz.`);
+        } catch (error) {
+            setExcelStatus(`Errore invio: ${error.message}`, true);
+        }
+    });
+}
+
 window.addEventListener('beforeunload', () => {
     if (snapshotTimer) {
         window.clearInterval(snapshotTimer);
     }
 });
 
-const teacherSubjectsStatus = document.getElementById('teacherSubjectsStatus');
-const teacherSubjectActions = document.getElementById('teacherSubjectActions');
-const teacherSubjectPreview = document.getElementById('teacherSubjectPreview');
-const teacherPublishQuizNowTopBtn = document.getElementById('teacherPublishQuizNowTopBtn');
-const teacherQueueSubjectBtn = document.getElementById('teacherQueueSubjectBtn');
-
-let loadedSubjectQuestions = null;
-let loadedSubjectName = '';
-let loadedSubjectKey = '';
-
-function setSubjectsStatus(message, isError = false) {
-    if (!teacherSubjectsStatus) return;
-    teacherSubjectsStatus.textContent = message;
-    teacherSubjectsStatus.style.color = isError ? 'var(--red)' : 'var(--muted)';
-}
-
-document.querySelectorAll('.subject-btn').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-        const subject = btn.dataset.subject;
-        if (!subject) return;
-
-        document.querySelectorAll('.subject-btn').forEach((b) => b.classList.remove('is-active'));
-        btn.classList.add('is-active');
-        setSubjectsStatus(`Caricamento ${btn.textContent.trim()} in corso...`);
-        if (teacherSubjectActions) teacherSubjectActions.hidden = true;
-        loadedSubjectQuestions = null;
-
-        try {
-            const response = await fetch(`/domande/${subject}.json`, { cache: 'no-store' });
-            if (!response.ok) throw new Error(`File non trovato (${response.status}).`);
-            const data = await response.json();
-            if (!Array.isArray(data) || data.length === 0) throw new Error('File vuoto o formato non valido.');
-
-            const questions = data.map((q, i) => normalizeQuestion(q, i));
-            loadedSubjectQuestions = questions;
-            loadedSubjectName = btn.textContent.trim();
-            loadedSubjectKey = subject;
-
-            const label = questions.length === 1 ? '1 domanda' : `${questions.length} domande`;
-            setSubjectsStatus(`${loadedSubjectName}: ${label} pronte`);
-            if (teacherSubjectPreview) {
-                teacherSubjectPreview.textContent = `${loadedSubjectName} — ${label} caricate. Usa i pulsanti qui sotto per inviarle al quiz.`;
-            }
-            if (teacherSubjectActions) teacherSubjectActions.hidden = false;
-        } catch (error) {
-            setSubjectsStatus(`Errore: ${error.message}`, true);
-            document.querySelectorAll('.subject-btn').forEach((b) => b.classList.remove('is-active'));
-        }
-    });
-});
-
-async function sendSubjectQuestionsCommand(commandType) {
-    if (!loadedSubjectQuestions || loadedSubjectQuestions.length === 0) {
-        setSubjectsStatus('Carica prima le domande di una materia.', true);
-        return;
-    }
-    try {
-        await sendCommand(commandType, { questions: loadedSubjectQuestions });
-        const label = loadedSubjectQuestions.length === 1 ? '1 domanda' : `${loadedSubjectQuestions.length} domande`;
-        setSubjectsStatus(
-            commandType === 'publish-batch'
-                ? `${loadedSubjectName}: ${label} pubblicate sul quiz.`
-                : `${loadedSubjectName}: ${label} aggiunte in coda.`
-        );
-        if (commandType === 'publish-batch') {
-            markSubjectStarted(loadedSubjectKey, loadedSubjectName);
-        }
-    } catch (error) {
-        setSubjectsStatus(`Errore invio: ${error.message}`, true);
-    }
-}
-
-if (teacherPublishQuizNowTopBtn) {
-    teacherPublishQuizNowTopBtn.addEventListener('click', () => {
-        void sendSubjectQuestionsCommand('publish-batch');
-    });
-}
-
-if (teacherQueueSubjectBtn) {
-    teacherQueueSubjectBtn.addEventListener('click', () => {
-        void sendSubjectQuestionsCommand('queue-batch');
-    });
-}
-
-// --- Esame guidato: rilevamento materie, fine materia e fine esame ---
-const teacherExamFlowCard = document.getElementById('teacherExamFlowCard');
-const teacherExamFlowStatus = document.getElementById('teacherExamFlowStatus');
-const teacherExamFlowMessage = document.getElementById('teacherExamFlowMessage');
-const teacherExamFlowActions = document.getElementById('teacherExamFlowActions');
-
-// Materia caricata automaticamente dallo studente all'avvio (vedi DEFAULT_SUBJECT in app.js).
-// La consideriamo gia attiva, cosi il suo completamento viene registrato come per le altre.
-const DEFAULT_SUBJECT = 'Italiano';
-
-let examPlan = [];
-let examPlanReady = false;
-const completedExamSubjects = new Set();
-let currentExamSubject = { subject: DEFAULT_SUBJECT, label: DEFAULT_SUBJECT };
-let prevSimulationCompleted = false;
-let examFlowInitialized = false;
-
-async function probeExamPlan() {
-    const buttons = [...document.querySelectorAll('.subject-btn')];
-    const plan = [];
-    for (const btn of buttons) {
-        const subject = btn.dataset.subject;
-        if (!subject) continue;
-        try {
-            const response = await fetch(`/domande/${subject}.json`, { cache: 'no-store' });
-            if (!response.ok) continue;
-            const data = await response.json();
-            if (Array.isArray(data) && data.length > 0) {
-                plan.push({ subject, label: btn.textContent.trim(), count: data.length });
-            }
-        } catch (_) {
-            /* materia non disponibile: ignora */
-        }
-    }
-    examPlan = plan;
-    examPlanReady = true;
-}
-
-function hideExamFlowPanel() {
-    if (teacherExamFlowCard) teacherExamFlowCard.hidden = true;
-}
-
-function markSubjectStarted(subjectKey, subjectLabel) {
-    currentExamSubject = subjectKey ? { subject: subjectKey, label: subjectLabel || subjectKey } : null;
-    hideExamFlowPanel();
-}
-
-function findNextSubject() {
-    return examPlan.find((entry) =>
-        !completedExamSubjects.has(entry.subject)
-        && (!currentExamSubject || entry.subject !== currentExamSubject.subject)
-    ) || null;
-}
-
-async function publishSubjectByKey(subjectKey, subjectLabel) {
-    try {
-        setActionStatus(`Caricamento ${subjectLabel} in corso...`);
-        const response = await fetch(`/domande/${subjectKey}.json`, { cache: 'no-store' });
-        if (!response.ok) throw new Error(`File non trovato (${response.status}).`);
-        const data = await response.json();
-        if (!Array.isArray(data) || data.length === 0) throw new Error('Materia senza domande.');
-        const questions = data.map((q, i) => normalizeQuestion(q, i));
-        await sendCommand('publish-batch', { questions });
-        loadedSubjectQuestions = questions;
-        loadedSubjectName = subjectLabel;
-        loadedSubjectKey = subjectKey;
-        markSubjectStarted(subjectKey, subjectLabel);
-        setActionStatus(`${subjectLabel}: ${questions.length === 1 ? '1 domanda' : `${questions.length} domande`} pubblicate sul quiz.`);
-    } catch (error) {
-        setActionStatus(`Errore invio ${subjectLabel}: ${error.message}`, true);
-    }
-}
-
-function clearExamFlowActions() {
-    if (teacherExamFlowActions) teacherExamFlowActions.innerHTML = '';
-}
-
-function addExamFlowButton(label, className, onClick) {
-    if (!teacherExamFlowActions) return;
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = `action-btn ${className}`;
-    button.textContent = label;
-    button.addEventListener('click', onClick);
-    teacherExamFlowActions.appendChild(button);
-}
-
-function showExamFlowPanel(statusText, messageText) {
-    if (!teacherExamFlowCard) return;
-    teacherExamFlowCard.hidden = false;
-    if (teacherExamFlowStatus) teacherExamFlowStatus.textContent = statusText;
-    if (teacherExamFlowMessage) teacherExamFlowMessage.textContent = messageText;
-    clearExamFlowActions();
-}
-
-function renderSubjectDonePanel() {
-    const doneLabel = currentExamSubject ? currentExamSubject.label : 'La materia';
-    const next = findNextSubject();
-    showExamFlowPanel(
-        'Materia completata',
-        `${doneLabel} completata. Lo studente e in pausa. Vuoi passare alla prossima materia o sceglierne una dalla banca domande qui sopra?`
-    );
-    if (next) {
-        addExamFlowButton(`Prossima materia: ${next.label}`, 'primary', () => {
-            void publishSubjectByKey(next.subject, next.label);
-        });
-    }
-    addExamFlowButton('Scegli una materia', 'secondary', () => {
-        hideExamFlowPanel();
-        const card = document.querySelector('.teacher-subjects-card');
-        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    });
-}
-
-function renderAllDonePanel() {
-    showExamFlowPanel(
-        'Tutte le materie completate',
-        "Lo studente ha completato tutte le materie disponibili. Vuoi selezionare una materia dalla banca domande o inserire una nuova domanda?"
-    );
-    addExamFlowButton('Scegli una materia', 'primary', () => {
-        hideExamFlowPanel();
-        const card = document.querySelector('.teacher-subjects-card');
-        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    });
-    addExamFlowButton('Inserisci una domanda', 'secondary', () => {
-        hideExamFlowPanel();
-        const card = document.querySelector('.teacher-compose-card');
-        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        if (teacherQuestionPromptInput) teacherQuestionPromptInput.focus();
-    });
-}
-
-function handleSubjectCompleted() {
-    if (currentExamSubject) {
-        completedExamSubjects.add(currentExamSubject.subject);
-    }
-    const allDone = examPlanReady
-        && examPlan.length > 0
-        && examPlan.every((entry) => completedExamSubjects.has(entry.subject));
-    if (allDone) {
-        renderAllDonePanel();
-    } else {
-        renderSubjectDonePanel();
-    }
-}
-
-function processExamFlow(snapshot) {
-    const completedNow = !!(snapshot && snapshot.simulationCompleted);
-    if (!examFlowInitialized) {
-        // Se al primo aggiornamento lo studente ha gia concluso la materia attiva
-        // (es. pannello aperto/ricaricato dopo la materia di default), registrala
-        // subito come fatta per non riproporla.
-        if (completedNow && currentExamSubject) {
-            completedExamSubjects.add(currentExamSubject.subject);
-        }
-        prevSimulationCompleted = completedNow;
-        examFlowInitialized = true;
-        return;
-    }
-    if (completedNow && !prevSimulationCompleted) {
-        handleSubjectCompleted();
-    }
-    prevSimulationCompleted = completedNow;
-}
-
 renderDisconnectedState('Connessione iniziale in corso...');
-void probeExamPlan();
 void refreshSnapshot();
 snapshotTimer = window.setInterval(() => {
     void refreshSnapshot();
 }, SNAPSHOT_REFRESH_MS);
+
+// ==========================================
+// GESTIONE STUDENTE, TEST SOSPESO E ARCHIVIO
+// ==========================================
+
+async function fetchStudentInfo() {
+    try {
+        const data = await fetchJson('/api/student/info');
+        if (data) {
+            currentActiveStudent = data.activeStudent || currentActiveStudent;
+            currentActiveSubject = data.activeSubject || currentActiveSubject;
+            if (currentStudentNameDisplay) currentStudentNameDisplay.textContent = currentActiveStudent;
+            if (currentSubjectNameDisplay) currentSubjectNameDisplay.textContent = currentActiveSubject;
+            if (currentStudentFolderDisplay) currentStudentFolderDisplay.textContent = `studenti/${currentActiveStudent}`;
+            if (archiveDirHint) archiveDirHint.textContent = `Cartella: studenti/${currentActiveStudent}`;
+        }
+        await checkSuspendedSession();
+        await loadResultsArchive();
+    } catch (e) {
+        console.warn('Errore recupero info studente:', e);
+    }
+}
+
+async function checkSuspendedSession() {
+    try {
+        const data = await fetchJson('/api/quiz/active-session');
+        if (data && data.session && Array.isArray(data.session.domande) && data.session.domande.length > 0) {
+            activeSuspendedSession = data.session;
+            if (suspendedSubjectBadge) suspendedSubjectBadge.textContent = data.session.materia || '-';
+            if (suspendedDateBadge) suspendedDateBadge.textContent = data.session.dataInizio || data.session.data || '-';
+            const totalQ = data.session.totaleDomande || data.session.domande?.length || 0;
+            const answeredCount = Array.isArray(data.session.answers) ? data.session.answers.filter(Boolean).length : 0;
+            if (suspendedProgressBadge) suspendedProgressBadge.textContent = `${answeredCount} / ${totalQ} risposte fornite (domanda ${(data.session.currentQuestionIndex || 0) + 1})`;
+            if (suspendedScoreBadge && data.session.score) {
+                suspendedScoreBadge.textContent = `${data.session.score.esatte || 0} esatte, ${data.session.score.errate || 0} errate (${data.session.score.percentuale || 0}%)`;
+            }
+            if (teacherSuspendedAlertCard) teacherSuspendedAlertCard.hidden = false;
+        } else {
+            activeSuspendedSession = null;
+            if (teacherSuspendedAlertCard) teacherSuspendedAlertCard.hidden = true;
+        }
+    } catch (e) {
+        if (teacherSuspendedAlertCard) teacherSuspendedAlertCard.hidden = true;
+    }
+}
+
+if (teacherResumeSessionBtn) {
+    teacherResumeSessionBtn.addEventListener('click', async () => {
+        if (!activeSuspendedSession) return;
+        try {
+            await sendCommand('resume-session', { session: activeSuspendedSession });
+            await fetchJson('/api/quiz/session-action', {
+                method: 'POST',
+                body: JSON.stringify({ action: 'resume' })
+            });
+            setActionStatus(`Test di ${activeSuspendedSession.materia} ripreso sul PC.`);
+            if (teacherSuspendedAlertCard) teacherSuspendedAlertCard.hidden = true;
+        } catch (e) {
+            setActionStatus(`Errore ripresa test: ${e.message}`, true);
+        }
+    });
+}
+
+if (teacherRestartSessionBtn) {
+    teacherRestartSessionBtn.addEventListener('click', async () => {
+        if (!activeSuspendedSession) return;
+        if (!confirm(`Vuoi davvero riniziare il test di ${activeSuspendedSession.materia} dalla prima domanda? Le risposte già registrate verranno azzerate.`)) {
+            return;
+        }
+        try {
+            await sendCommand('restart-session', { session: activeSuspendedSession });
+            await fetchJson('/api/quiz/session-action', {
+                method: 'POST',
+                body: JSON.stringify({ action: 'restart' })
+            });
+            setActionStatus(`Test di ${activeSuspendedSession.materia} riavviato dall'inizio sul PC.`);
+            if (teacherSuspendedAlertCard) teacherSuspendedAlertCard.hidden = true;
+        } catch (e) {
+            setActionStatus(`Errore riavvio test: ${e.message}`, true);
+        }
+    });
+}
+
+if (teacherNewSessionBtn) {
+    teacherNewSessionBtn.addEventListener('click', async () => {
+        try {
+            await sendCommand('new-session', {});
+            await fetchJson('/api/quiz/session-action', {
+                method: 'POST',
+                body: JSON.stringify({ action: 'new' })
+            });
+            setActionStatus('Test sospeso archiviato. Pronto per un nuovo test.');
+            if (teacherSuspendedAlertCard) teacherSuspendedAlertCard.hidden = true;
+            activeSuspendedSession = null;
+        } catch (e) {
+            setActionStatus(`Errore: ${e.message}`, true);
+        }
+    });
+}
+
+if (teacherPrintCompletedBtn) {
+    teacherPrintCompletedBtn.addEventListener('click', () => {
+        const student = activeCompletedResult?.student || currentActiveStudent;
+        const file = activeCompletedResult?.fileName || '';
+        const url = `/stampa-risultato?student=${encodeURIComponent(student)}&file=${encodeURIComponent(file)}&autoPrint=1`;
+        window.open(url, '_blank');
+    });
+}
+
+if (teacherDismissCompletedBtn) {
+    teacherDismissCompletedBtn.addEventListener('click', () => {
+        if (teacherCompletedAlertCard) teacherCompletedAlertCard.hidden = true;
+    });
+}
+
+async function loadResultsArchive() {
+    if (!teacherArchiveList) return;
+    try {
+        if (teacherArchiveStatus) teacherArchiveStatus.textContent = 'Caricamento...';
+        const data = await fetchJson(`/api/quiz/results?student=${encodeURIComponent(currentActiveStudent)}`);
+        const files = Array.isArray(data.files) ? data.files : (Array.isArray(data.results) ? data.results : []);
+        if (teacherArchiveStatus) {
+            teacherArchiveStatus.textContent = files.length === 1 ? '1 quiz archiviato' : `${files.length} quiz archiviati`;
+        }
+
+        if (files.length === 0) {
+            teacherArchiveList.innerHTML = `
+                <div class="archive-empty">
+                    <p>Nessun quiz archiviato finora per <strong>${escapeTeacherHtml(currentActiveStudent)}</strong>.</p>
+                    <small>I quiz conclusi verranno salvati automaticamente in <code>studenti/${escapeTeacherHtml(currentActiveStudent)}</code> con nome materia e data.</small>
+                </div>
+            `;
+            return;
+        }
+
+        teacherArchiveList.innerHTML = files.map((f) => {
+            const isParziale = f.isParziale;
+            const badgeClass = isParziale ? 'status-warning' : 'status-success';
+            const badgeText = isParziale ? 'Parziale / Sospeso' : 'Completato';
+            const scoreText = f.score ? `${f.score.percentuale || 0}% (${f.score.esatte || 0} esatte, ${f.score.errate || 0} errate)` : '-';
+            const printBtnHtml = !isParziale ? `
+                <a href="/stampa-risultato?student=${encodeURIComponent(currentActiveStudent)}&file=${encodeURIComponent(f.fileName)}&autoPrint=1"
+                   target="_blank" class="action-btn primary teacher-btn-xs" title="Stampa o Salva in formato PDF">
+                   🖨️ Stampa PDF
+                </a>
+            ` : '';
+
+            return `
+                <div class="archive-entry">
+                    <div class="archive-entry-main">
+                        <div class="archive-entry-top">
+                            <strong class="archive-subject">${escapeTeacherHtml(f.materia || 'Quiz')}</strong>
+                            <span class="status-pill ${badgeClass}">${badgeText}</span>
+                            <span class="archive-date">${escapeTeacherHtml(f.data || '')}</span>
+                        </div>
+                        <div class="archive-entry-meta">
+                            <span>Esito: <strong>${scoreText}</strong></span>
+                            <span>File: <code>${escapeTeacherHtml(f.fileName)}</code></span>
+                        </div>
+                    </div>
+                    <div class="archive-entry-actions">
+                        ${printBtnHtml}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (e) {
+        console.error('Errore caricamento archivio:', e);
+        if (teacherArchiveStatus) teacherArchiveStatus.textContent = 'Errore';
+        teacherArchiveList.innerHTML = `<p class="archive-error">Errore nel caricamento dei risultati: ${e.message}</p>`;
+    }
+}
+
+if (refreshArchiveBtn) {
+    refreshArchiveBtn.addEventListener('click', () => {
+        void loadResultsArchive();
+    });
+}
+
+// ------------------------------------------
+// BANCA MATERIE
+// ------------------------------------------
+teacherSubjectButtons.forEach((btn) => {
+    btn.addEventListener('click', async () => {
+        const subject = btn.dataset.subject;
+        if (!subject) return;
+
+        teacherSubjectButtons.forEach((b) => b.classList.remove('is-active'));
+        btn.classList.add('is-active');
+
+        try {
+            if (teacherSubjectsStatus) teacherSubjectsStatus.textContent = `Caricamento ${subject}...`;
+            const questions = await fetchJson(`/domande/${encodeURIComponent(subject)}.json`);
+            if (!Array.isArray(questions) || questions.length === 0) {
+                if (teacherSubjectsStatus) teacherSubjectsStatus.textContent = `${subject} non contiene ancora domande.`;
+                if (teacherSubjectPreviewArea) teacherSubjectPreviewArea.hidden = true;
+                return;
+            }
+
+            selectedSubjectQuestions = questions;
+            selectedSubjectName = subject;
+
+            if (teacherSubjectNameBadge) teacherSubjectNameBadge.textContent = subject;
+            if (teacherSubjectCountBadge) teacherSubjectCountBadge.textContent = `${questions.length} domande pronte`;
+            if (teacherSubjectPreviewPrompt) {
+                teacherSubjectPreviewPrompt.textContent = `1ª domanda: "${questions[0].prompt || questions[0].title}" (${questions[0].options?.length || 0} opzioni)`;
+            }
+            if (teacherSubjectPreviewArea) teacherSubjectPreviewArea.hidden = false;
+            if (teacherSubjectsStatus) teacherSubjectsStatus.textContent = `Selezionato: ${subject} (${questions.length} domande)`;
+        } catch (e) {
+            console.error('Errore caricamento materia:', e);
+            if (teacherSubjectsStatus) teacherSubjectsStatus.textContent = `Errore caricamento ${subject}: ${e.message}`;
+            if (teacherSubjectPreviewArea) teacherSubjectPreviewArea.hidden = true;
+        }
+    });
+});
+
+if (teacherClearSubjectBtn) {
+    teacherClearSubjectBtn.addEventListener('click', () => {
+        selectedSubjectQuestions = null;
+        selectedSubjectName = null;
+        if (teacherSubjectPreviewArea) teacherSubjectPreviewArea.hidden = true;
+        teacherSubjectButtons.forEach((b) => b.classList.remove('is-active'));
+        if (teacherSubjectsStatus) teacherSubjectsStatus.textContent = 'Scegli una materia';
+    });
+}
+
+if (teacherPublishSubjectBtn) {
+    teacherPublishSubjectBtn.addEventListener('click', async () => {
+        if (!selectedSubjectQuestions || selectedSubjectQuestions.length === 0) {
+            setActionStatus('Nessuna materia selezionata.', true);
+            return;
+        }
+        try {
+            await sendCommand('publish-batch', {
+                questions: selectedSubjectQuestions,
+                subject: selectedSubjectName
+            });
+            await fetchJson('/api/students/active', {
+                method: 'POST',
+                body: JSON.stringify({ activeSubject: selectedSubjectName })
+            });
+            currentActiveSubject = selectedSubjectName;
+            if (currentSubjectNameDisplay) currentSubjectNameDisplay.textContent = selectedSubjectName;
+            setActionStatus(`Quiz avviato con ${selectedSubjectQuestions.length} domande di ${selectedSubjectName}!`);
+            if (teacherSubjectsStatus) teacherSubjectsStatus.textContent = `Pubblicato con successo: ${selectedSubjectName}!`;
+            await checkSuspendedSession();
+        } catch (e) {
+            setActionStatus(`Errore pubblicazione: ${e.message}`, true);
+        }
+    });
+}
+
+if (teacherQueueSubjectBtn) {
+    teacherQueueSubjectBtn.addEventListener('click', async () => {
+        if (!selectedSubjectQuestions || selectedSubjectQuestions.length === 0) {
+            setActionStatus('Nessuna materia selezionata.', true);
+            return;
+        }
+        try {
+            await sendCommand('queue-batch', {
+                questions: selectedSubjectQuestions,
+                subject: selectedSubjectName
+            });
+            setActionStatus(`${selectedSubjectQuestions.length} domande di ${selectedSubjectName} aggiunte in coda sul PC.`);
+        } catch (e) {
+            setActionStatus(`Errore invio in coda: ${e.message}`, true);
+        }
+    });
+}
+
+void fetchStudentInfo();
+

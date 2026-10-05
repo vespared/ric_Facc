@@ -460,58 +460,293 @@
     color: var(--muted);
 }
 
-.subject-areas {
+/* --- Modello di Importazione Excel / CSV --- */
+.teacher-excel-card {
     display: grid;
-    gap: 14px;
+    gap: 16px;
 }
 
-.subject-area {
-    display: grid;
-    gap: 8px;
+.teacher-dropzone {
+    position: relative;
+    border: 2px dashed rgba(45, 226, 230, 0.35);
+    border-radius: 20px;
+    padding: 26px 18px;
+    text-align: center;
+    background: rgba(45, 226, 230, 0.03);
+    cursor: pointer;
+    transition: all 0.22s ease;
+    overflow: hidden;
 }
 
-.subject-area-label {
+.teacher-dropzone:hover,
+.teacher-dropzone.is-dragover {
+    border-color: var(--cyan);
+    background: rgba(45, 226, 230, 0.09);
+    box-shadow: 0 0 24px rgba(45, 226, 230, 0.16);
+    transform: translateY(-2px);
+}
+
+.teacher-file-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.dropzone-content {
+    display: grid;
+    place-items: center;
+    gap: 6px;
+    pointer-events: none;
+}
+
+.dropzone-icon {
+    font-size: 2.2rem;
+    margin-bottom: 4px;
+    filter: drop-shadow(0 4px 12px rgba(45, 226, 230, 0.3));
+}
+
+.dropzone-title {
+    font-size: 1.02rem;
+    color: var(--text);
+}
+
+.dropzone-subtitle {
+    font-size: 0.84rem;
     color: var(--muted);
-    font-size: 0.78rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
 }
 
-.subject-btn-row {
+.teacher-excel-tools {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
 }
 
-.subject-btn-row .action-btn {
-    flex: 0 1 auto;
-    padding: 10px 16px;
-    font-size: 0.88rem;
+.teacher-btn-sm {
+    padding: 9px 13px;
+    font-size: 0.83rem;
     border-radius: 14px;
-    transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+    flex: 1 1 auto;
 }
 
-.subject-btn.is-active {
-    border-color: rgba(45, 226, 230, 0.75);
-    background: rgba(45, 226, 230, 0.1);
-    box-shadow: 0 0 0 3px rgba(45, 226, 230, 0.14);
+.teacher-btn-xs {
+    padding: 5px 10px;
+    font-size: 0.78rem;
+    border-radius: 10px;
 }
 
-#teacherPublishQuizNowTopBtn {
-    width: 100%;
-    margin-top: 16px;
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
-.teacher-subject-preview {
-    margin: 14px 0 12px;
-    padding: 12px 14px;
-    border-radius: 14px;
-    background: rgba(45, 226, 230, 0.07);
-    border: 1px solid rgba(45, 226, 230, 0.2);
+/* Anteprima File Excel */
+.teacher-excel-preview-area {
+    display: grid;
+    gap: 14px;
+    padding: 16px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    animation: fadeIn 0.2s ease;
+}
+
+.excel-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.excel-preview-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.excel-preview-meta strong {
+    font-size: 1.02rem;
     color: var(--text);
-    font-size: 0.92rem;
-    line-height: 1.45;
+}
+
+.excel-preview-count {
+    color: var(--cyan);
+    font-size: 0.88rem;
+    font-weight: 700;
+}
+
+.excel-preview-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.badge-opt {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.badge-opt.count-4 {
+    background: rgba(54, 216, 255, 0.16);
+    color: var(--cyan);
+    border: 1px solid rgba(54, 216, 255, 0.3);
+}
+
+.badge-opt.count-3 {
+    background: rgba(255, 209, 102, 0.16);
+    color: var(--yellow);
+    border: 1px solid rgba(255, 209, 102, 0.3);
+}
+
+.badge-opt.count-2 {
+    background: rgba(113, 247, 159, 0.16);
+    color: var(--green);
+    border: 1px solid rgba(113, 247, 159, 0.3);
+}
+
+.excel-preview-list {
+    display: grid;
+    gap: 10px;
+    max-height: 380px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.excel-preview-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.excel-preview-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 999px;
+}
+
+.excel-preview-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 12px 14px;
+    display: grid;
+    gap: 8px;
+}
+
+.excel-preview-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.excel-preview-card-idx {
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.excel-preview-card-title {
+    color: var(--text);
+    font-size: 0.94rem;
+    flex: 1 1 auto;
+}
+
+.excel-preview-card-badge {
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    font-size: 0.72rem;
+    color: var(--muted);
+    font-weight: 700;
+}
+
+.excel-preview-card-prompt {
+    font-size: 0.88rem;
+    color: #e2eafc;
+    line-height: 1.4;
+    margin: 0;
+}
+
+.excel-preview-card-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.preview-opt-item {
+    font-size: 0.78rem;
+    padding: 4px 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--muted);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.preview-opt-item.is-correct {
+    background: rgba(113, 247, 159, 0.18);
+    color: var(--green);
+    border-color: rgba(113, 247, 159, 0.4);
+    font-weight: 700;
+}
+
+.preview-opt-item strong {
+    color: var(--text);
+}
+
+/* Selettore pillole numero risposte domanda live */
+.option-count-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.option-count-label {
+    color: var(--muted);
+    font-size: 0.88rem;
+    font-weight: 700;
+}
+
+.option-count-pills {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.count-pill {
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--muted);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.18s ease;
+}
+
+.count-pill:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text);
+}
+
+.count-pill.is-active {
+    background: linear-gradient(135deg, var(--cyan), #4c9eff);
+    color: #04101e;
+    border-color: transparent;
+    box-shadow: 0 4px 14px rgba(45, 226, 230, 0.28);
 }
 
 @media (max-width: 1180px) {
@@ -545,35 +780,403 @@
     }
 }
 
-/* Pannello esame guidato (fine materia / fine esame) */
-.teacher-exam-flow-card {
-    border: 1px solid rgba(255, 209, 102, 0.45);
-    box-shadow: 0 0 0 3px rgba(255, 209, 102, 0.12);
+/* --- Header di Contesto Sessione (Studente / Materia / Cartella PC) --- */
+.teacher-top-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 16px 22px;
+    margin-bottom: 18px;
+    border-radius: 20px;
+    background: rgba(15, 28, 51, 0.88);
+    border: 1px solid rgba(136, 176, 255, 0.18);
+    backdrop-filter: blur(18px);
+    box-shadow: var(--shadow);
 }
 
-.teacher-exam-flow-message {
-    margin: 14px 0 16px;
-    padding: 12px 14px;
-    border-radius: 14px;
-    background: rgba(255, 209, 102, 0.08);
-    border: 1px solid rgba(255, 209, 102, 0.28);
-    color: var(--text);
-    font-size: 0.95rem;
-    line-height: 1.5;
-}
-
-.teacher-exam-flow-actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+.teacher-header-brand {
+    display: flex;
+    align-items: center;
     gap: 12px;
 }
 
-.teacher-exam-flow-actions:has(.action-btn:only-child) {
-    grid-template-columns: 1fr;
+.teacher-logo-badge {
+    font-weight: 800;
+    font-size: 1.25rem;
+    letter-spacing: -0.01em;
+    background: linear-gradient(135deg, var(--cyan), #4c9eff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
-@media (max-width: 720px) {
-    .teacher-exam-flow-actions {
-        grid-template-columns: 1fr;
-    }
+.teacher-role-tag {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    background: rgba(255, 255, 255, 0.06);
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
 }
+
+.teacher-session-context {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 18px;
+}
+
+.context-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.92rem;
+}
+
+.context-label {
+    color: var(--muted);
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.context-item strong {
+    color: var(--text);
+    font-weight: 700;
+}
+
+.context-folder code {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 0.82rem;
+    color: var(--cyan);
+}
+
+/* --- Avvisi Test Sospeso e Test Concluso --- */
+.teacher-suspended-card {
+    border-color: rgba(245, 158, 11, 0.5) !important;
+    background: linear-gradient(180deg, rgba(245, 158, 11, 0.08), rgba(15, 28, 51, 0.85)) !important;
+    box-shadow: 0 10px 30px rgba(245, 158, 11, 0.12) !important;
+}
+
+.status-warning {
+    color: #fbbf24 !important;
+    background: rgba(245, 158, 11, 0.15) !important;
+    border: 1px solid rgba(245, 158, 11, 0.3) !important;
+    padding: 4px 10px;
+    border-radius: 9999px;
+}
+
+.status-success {
+    color: #4ade80 !important;
+    background: rgba(34, 197, 94, 0.15) !important;
+    border: 1px solid rgba(34, 197, 94, 0.3) !important;
+    padding: 4px 10px;
+    border-radius: 9999px;
+}
+
+.suspended-alert-body {
+    display: grid;
+    gap: 14px;
+    margin-top: 6px;
+}
+
+.suspended-alert-text {
+    font-size: 0.96rem;
+    color: var(--text);
+    line-height: 1.5;
+}
+
+.suspended-details-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.suspended-detail-pill {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.suspended-detail-pill span {
+    font-size: 0.76rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.suspended-detail-pill strong {
+    font-size: 0.96rem;
+    color: var(--text);
+}
+
+.suspended-actions-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-top: 6px;
+}
+
+.teacher-completed-card {
+    border-color: rgba(34, 197, 94, 0.5) !important;
+    background: linear-gradient(180deg, rgba(34, 197, 94, 0.08), rgba(15, 28, 51, 0.85)) !important;
+    box-shadow: 0 10px 30px rgba(34, 197, 94, 0.12) !important;
+}
+
+.completed-alert-body h3 {
+    font-size: 1.25rem;
+    color: #4ade80;
+    margin-top: 4px;
+}
+
+.completed-alert-text {
+    font-size: 0.96rem;
+    color: var(--text);
+    margin: 8px 0 14px;
+}
+
+/* --- Banca Domande per Materia --- */
+.subject-areas {
+    display: grid;
+    gap: 14px;
+    margin-top: 12px;
+}
+
+.subject-area {
+    display: grid;
+    gap: 6px;
+}
+
+.subject-area-label {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+}
+
+.subject-btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.subject-btn {
+    padding: 8px 14px;
+    font-size: 0.88rem;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.18s ease;
+}
+
+.subject-btn:hover {
+    background: rgba(45, 226, 230, 0.15);
+    border-color: var(--cyan);
+    color: #ffffff;
+    transform: translateY(-1px);
+}
+
+.subject-btn.is-active {
+    background: linear-gradient(135deg, var(--cyan), #4c9eff);
+    color: #04101e;
+    border-color: transparent;
+    font-weight: 700;
+    box-shadow: 0 4px 14px rgba(45, 226, 230, 0.28);
+}
+
+.teacher-subject-preview-area {
+    margin-top: 16px;
+    padding: 16px;
+    border-radius: 14px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(136, 176, 255, 0.2);
+    display: grid;
+    gap: 12px;
+}
+
+.subject-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.subject-preview-header strong {
+    font-size: 1.1rem;
+    color: var(--cyan);
+}
+
+.subject-preview-count {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-left: 8px;
+}
+
+.subject-preview-prompt {
+    font-size: 0.92rem;
+    color: var(--text);
+    line-height: 1.4;
+    font-style: italic;
+}
+
+/* --- Archivio Risultati Studente --- */
+.teacher-archive-card {
+    display: grid;
+    gap: 14px;
+}
+
+.archive-header-tools {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.archive-dir-hint {
+    font-size: 0.78rem;
+    color: var(--muted);
+}
+
+.teacher-archive-list {
+    display: grid;
+    gap: 10px;
+    max-height: 380px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.archive-empty {
+    font-size: 0.9rem;
+    color: var(--muted);
+    font-style: italic;
+    padding: 16px 0;
+    text-align: center;
+}
+
+.archive-entry {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.archive-entry:hover {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(136, 176, 255, 0.25);
+}
+
+.archive-entry-info {
+    display: grid;
+    gap: 3px;
+}
+
+.archive-entry-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.archive-entry-title {
+    font-weight: 700;
+    font-size: 0.98rem;
+    color: var(--text);
+}
+
+.archive-tag {
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 6px;
+}
+
+.archive-tag--total {
+    background: rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+.archive-tag--partial {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.archive-entry-date {
+    font-size: 0.8rem;
+    color: var(--muted);
+}
+
+.archive-entry-stats {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.archive-entry-stats strong {
+    color: var(--cyan);
+}
+
+.archive-entry-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* --- Modale Cambio Studente --- */
+.teacher-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(3, 7, 18, 0.75);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.teacher-modal-card {
+    background: #0d1a33;
+    border: 1px solid rgba(136, 176, 255, 0.3);
+    border-radius: 24px;
+    padding: 28px;
+    width: min(520px, 100%);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+}
+
+.teacher-modal-title {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: var(--text);
+    margin-top: 8px;
+}
+
+.teacher-modal-desc {
+    font-size: 0.9rem;
+    color: var(--muted);
+    margin-top: 6px;
+    line-height: 1.4;
+}
+
