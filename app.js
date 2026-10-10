@@ -181,6 +181,7 @@ function resumeQuizSession(session) {
         return;
     }
     questionSet = cloneQuestionSet(session.domande);
+    setQuestionFileGate(false);
     currentQuizSession.id = session.id;
     currentQuizSession.student = session.studente || currentQuizSession.student;
     currentQuizSession.subject = session.materia || currentQuizSession.subject;
@@ -213,6 +214,7 @@ function restartQuizSession(session) {
         return;
     }
     questionSet = cloneQuestionSet(session.domande);
+    setQuestionFileGate(false);
     currentQuizSession.id = `quiz_${Date.now()}`;
     currentQuizSession.student = session.studente || currentQuizSession.student;
     currentQuizSession.subject = session.materia || currentQuizSession.subject;
@@ -312,6 +314,8 @@ let confirmProgressMode = 'confirm';
 let confirmCancelEnabled = false;
 let simulationCompleted = false;
 let examStarted = true;
+// Il quiz resta bloccato dietro la schermata iniziale finche non viene caricato un file di domande.
+let awaitingQuestionFile = true;
 let nextQuestionTimer = null;
 let manualLock = false;
 let demoRunning = false;
@@ -381,6 +385,11 @@ const restoreDefaultQuestionsBtn = document.getElementById('restoreDefaultQuesti
 const importStatus = document.getElementById('importStatus');
 const remoteSyncStatus = document.getElementById('remoteSyncStatus');
 const teacherUrlHint = document.getElementById('teacherUrlHint');
+const questionFileGate = document.getElementById('questionFileGate');
+const gateLoadFileBtn = document.getElementById('gateLoadFileBtn');
+const gateFileInput = document.getElementById('gateFileInput');
+const gateFileStatus = document.getElementById('gateFileStatus');
+const gateCameraPicker = document.getElementById('gateCameraPicker');
 
 const LEFT_EYE = [362, 385, 387, 263, 373, 380];
 const RIGHT_EYE = [33, 160, 158, 133, 153, 144];
@@ -681,6 +690,33 @@ function updateImportStatus(message, isError = false) {
     importStatus.style.color = isError ? 'var(--red)' : 'var(--muted)';
 }
 
+function setGateFileStatus(message, isError = false) {
+    if (!gateFileStatus) {
+        return;
+    }
+    gateFileStatus.textContent = message;
+    gateFileStatus.classList.toggle('is-error', isError);
+}
+
+// Blocca (true) o sblocca (false) l'accesso al quiz dietro la schermata iniziale.
+function setQuestionFileGate(locked) {
+    awaitingQuestionFile = locked;
+    if (!questionFileGate) {
+        return;
+    }
+
+    questionFileGate.classList.toggle('exam-gate--hidden', !locked);
+    questionFileGate.setAttribute('aria-hidden', String(!locked));
+    questionFileGate.toggleAttribute('inert', !locked);
+
+    if (locked) {
+        setGateFileStatus('Nessun file caricato.');
+        if (gateLoadFileBtn) {
+            gateLoadFileBtn.focus();
+        }
+    }
+}
+
 function setRemoteSyncStatus(message, isError = false) {
     if (!remoteSyncStatus) {
         return;
@@ -756,20 +792,23 @@ function captureDebugFrames() {
 }
 
 function buildStudentSnapshot(includeFrames = false) {
-    const question = simulationCompleted ? null : currentQuestion();
+    const question = simulationCompleted || awaitingQuestionFile ? null : currentQuestion();
     const snapshot = {
         isRunning,
         cameraState: cameraState.textContent,
+        awaitingQuestionFile,
         currentState,
-        phaseLabel: phaseState.textContent,
+        phaseLabel: awaitingQuestionFile ? 'In attesa del file domande' : phaseState.textContent,
         commandLabel: commandState.textContent,
         currentQuestionIndex,
-        questionCount: questionSet.length,
+        questionCount: awaitingQuestionFile ? 0 : questionSet.length,
         simulationCompleted,
         focusedIndex,
         selectedIndex,
         answerLockedIndex,
-        questionCounterLabel: `${Math.min(currentQuestionIndex + 1, questionSet.length)} / ${questionSet.length}`,
+        questionCounterLabel: awaitingQuestionFile
+            ? '- / -'
+            : `${Math.min(currentQuestionIndex + 1, questionSet.length)} / ${questionSet.length}`,
         faceDetected: lastFaceDetected,
         metrics: {
             leftEar: Number(latestEarLeft.toFixed(3)),
@@ -1323,6 +1362,7 @@ function publishQuestionBatchNow(rawQuestions, source = 'Tablet docente', subjec
     // domande del file: cosi il conteggio coincide sempre con il file caricato e non
     // si sommano eventuali domande gia presenti (es. la materia caricata di default).
     questionSet = cloneQuestionSet(rawQuestions);
+    setQuestionFileGate(false);
     const firstQuestion = questionSet[0];
 
     simulationCompleted = false;
@@ -1373,8 +1413,37 @@ function queueQuestionBatchAsNext(rawQuestions, source = 'Tablet docente') {
     });
 }
 
+// Comandi che agiscono sulle domande: non eseguibili finche non e' stato caricato un file.
+const REMOTE_COMMANDS_REQUIRING_QUESTIONS = new Set([
+    'read-question',
+    'simulate-scroll',
+    'simulate-select',
+    'simulate-confirm',
+    'reset-flow',
+    'publish-now',
+    'queue-next',
+    'queue-batch',
+    'next-question',
+    'repeat-question'
+]);
+
+// Dopo la pubblicazione di un file lo studente deve poter rispondere: attiva la webcam
+// senza annunciarla, poi legge subito la domanda attiva.
+async function startQuizAfterPublish() {
+    if (!isRunning) {
+        logEvent('Quiz pubblicato: avvio automatico della webcam.');
+        await startCamera({ announce: false });
+    }
+    void readCurrentQuestion();
+}
+
 async function executeRemoteCommand(command) {
     const payload = command.payload || {};
+
+    if (awaitingQuestionFile && REMOTE_COMMANDS_REQUIRING_QUESTIONS.has(command.type)) {
+        logEvent(`Comando ${command.type} ignorato: in attesa del file delle domande.`);
+        throw new Error('Quiz in attesa del file delle domande: caricalo con il pulsante sul PC studente o pubblicalo dal pannello docente.');
+    }
 
     if (command.type === 'start-exam') {
         ensureAudioContext();
@@ -1384,8 +1453,10 @@ async function executeRemoteCommand(command) {
 
     if (command.type === 'start-camera') {
         logEvent('Tablet docente: richiesta avvio webcam ricevuta.');
-        await startCamera();
-        return 'Webcam avviata sul PC.';
+        if (!(await startCamera())) {
+            throw new Error('Webcam USB esterna non disponibile sul PC: controlla il collegamento e riprova.');
+        }
+        return 'Webcam USB avviata sul PC.';
     }
 
     if (command.type === 'read-question') {
@@ -1444,13 +1515,7 @@ async function executeRemoteCommand(command) {
 
     if (command.type === 'publish-batch') {
         publishQuestionBatchNow(payload.questions || [], 'Tablet docente', payload.subject);
-        // Pubblicando il quiz lo studente deve poter rispondere: attiva la webcam
-        // senza annunciarla, poi legge subito la domanda attiva.
-        if (!isRunning) {
-            logEvent('Quiz pubblicato: avvio automatico della webcam.');
-            await startCamera({ announce: false });
-        }
-        void readCurrentQuestion();
+        await startQuizAfterPublish();
         return 'File di domande pubblicato subito sul PC.';
     }
 
@@ -1499,8 +1564,10 @@ async function executeRemoteCommand(command) {
         simulationCompleted = false;
         resetCurrentFlow(true);
         hideSuspendedBanner();
-        logEvent('Nuovo test pronto ad essere avviato.');
-        return 'Nuova sessione di test avviata.';
+        // Un nuovo test riparte dalla schermata iniziale: va caricato il file delle domande.
+        setQuestionFileGate(true);
+        logEvent('Nuovo test pronto: in attesa del file delle domande.');
+        return 'Nuova sessione di test avviata: in attesa del file delle domande.';
     }
 
     if (command.type === 'set-student') {
@@ -2772,6 +2839,14 @@ function updateChoiceMachine(leftEar, rightEar, mar, faceDetected) {
     avgEarValue.textContent = averageEar.toFixed(3);
     liveMarValue.textContent = mar.toFixed(3);
 
+    // Quiz non ancora aperto: i gesti del viso non devono muovere nulla dietro la schermata iniziale.
+    if (awaitingQuestionFile) {
+        mouthOpenStartedAt = null;
+        eyeHoldStartedAt = null;
+        cancelHoldStartedAt = null;
+        return;
+    }
+
     if (!faceDetected) {
         setCommandState(isRunning ? 'Volto non rilevato' : 'In attesa');
         mouthOpenStartedAt = null;
@@ -2913,43 +2988,63 @@ faceMesh.setOptions({
 
 faceMesh.onResults(onResults);
 
+// La webcam deve essere esterna (USB): vedi webcam-usb.js. Se non e' collegata NON si
+// ripiega sulla webcam integrata. Restituisce true se la webcam e' attiva.
 async function startCamera({ announce = true } = {}) {
     if (isRunning) {
-        return;
+        return true;
     }
 
     ensureAudioContext();
     loadingOverlay.classList.add('active');
-    cameraState.textContent = 'Avvio webcam in corso';
+    cameraState.textContent = 'Avvio webcam USB in corso';
     startBtn.disabled = true;
     startBtn.textContent = 'Avvio webcam...';
 
     try {
-        camera = new Camera(videoElement, {
-            onFrame: async () => {
-                await faceMesh.send({ image: videoElement });
-            },
-            width: 640,
-            height: 480
-        });
+        camera = await RicFaccWebcam.start(videoElement, async () => {
+            await faceMesh.send({ image: videoElement });
+        }, { width: 640, height: 480, onEnded: handleCameraDisconnected });
 
-        await camera.start();
         isRunning = true;
-        cameraState.textContent = 'Webcam attiva e tracking pronto';
+        cameraState.textContent = `Webcam USB attiva: ${camera.label}`;
         startBtn.textContent = 'Webcam attiva';
-        logEvent('Webcam attivata correttamente.');
+        logEvent(`Webcam USB attivata correttamente: ${camera.label}.`);
         if (announce) {
             speakText('Webcam attiva. Il sistema e pronto per il test.', { interrupt: true, rate: 1.03 });
         }
+        return true;
     } catch (error) {
         console.error('Errore webcam:', error);
-        cameraState.textContent = 'Errore accesso webcam';
+        camera = null;
+        const notConnected = Boolean(error) && error.code === RicFaccWebcam.ERR_NO_EXTERNAL;
+        cameraState.textContent = notConnected ? 'Webcam USB esterna non collegata' : 'Errore accesso webcam';
         startBtn.disabled = false;
         startBtn.textContent = 'Riprova webcam';
         loadingOverlay.classList.remove('active');
-        logEvent('Errore nell accesso alla webcam.');
-        alert('Impossibile accedere alla webcam. Verifica i permessi del browser.');
+        if (notConnected) {
+            logEvent('Webcam USB esterna non rilevata: collegarla al PC e riprovare.');
+        } else {
+            logEvent('Errore nell accesso alla webcam.');
+            alert('Impossibile accedere alla webcam. Verifica i permessi del browser.');
+        }
+        return false;
     }
+}
+
+// La webcam USB e' stata scollegata mentre era in uso.
+function handleCameraDisconnected() {
+    camera = null;
+    isRunning = false;
+    lastFaceDetected = false;
+    latestFraming = createEmptyFraming(false);
+    cameraState.textContent = 'Webcam USB scollegata';
+    startBtn.disabled = false;
+    startBtn.textContent = 'Riavvia webcam';
+    loadingOverlay.classList.remove('active');
+    updateChoiceMachine(latestEarLeft, latestEarRight, latestMar, false);
+    logEvent('Webcam USB scollegata: ricollegarla e riavviare la webcam.');
+    speakText('Webcam scollegata. Controlla il cavo USB.', { interrupt: true, rate: 1.02 });
 }
 
 async function stopCamera() {
@@ -2960,13 +3055,10 @@ async function stopCamera() {
         if (camera) {
             await camera.stop();
         }
-        if (videoElement.srcObject) {
-            videoElement.srcObject.getTracks().forEach((track) => track.stop());
-            videoElement.srcObject = null;
-        }
     } catch (error) {
         console.warn('Errore durante lo stop della webcam:', error);
     }
+    camera = null;
     isRunning = false;
     lastFaceDetected = false;
     latestFraming = createEmptyFraming(false);
@@ -3133,6 +3225,39 @@ restoreDefaultQuestionsBtn.addEventListener('click', () => {
     logEvent('Ripristinate le domande base del progetto.');
 });
 
+// Schermata iniziale: il file delle domande si carica da qui prima di accedere al quiz.
+async function loadQuestionFileFromGate(file) {
+    gateLoadFileBtn.disabled = true;
+    setGateFileStatus(`Lettura di ${file.name} in corso...`);
+
+    try {
+        const questions = await parseQuestionFile(file);
+        publishQuestionBatchNow(questions, 'PC studente', currentQuizSession.subject);
+        const loadedMessage = `Caricato: ${file.name} (${questionSet.length} domande)`;
+        updateImportStatus(loadedMessage);
+        setGateFileStatus(loadedMessage);
+        await startQuizAfterPublish();
+    } catch (error) {
+        console.error('Errore importazione test:', error);
+        setGateFileStatus(`File non valido: ${error.message}`, true);
+        logEvent(`Import fallito: ${error.message}`);
+    } finally {
+        gateLoadFileBtn.disabled = false;
+        gateFileInput.value = '';
+    }
+}
+
+gateLoadFileBtn.addEventListener('click', () => {
+    gateFileInput.click();
+});
+
+gateFileInput.addEventListener('change', () => {
+    const file = gateFileInput.files && gateFileInput.files[0];
+    if (file) {
+        void loadQuestionFileFromGate(file);
+    }
+});
+
 window.addEventListener('beforeunload', () => {
     if (remoteStateTimer) {
         window.clearInterval(remoteStateTimer);
@@ -3156,6 +3281,8 @@ if (window.speechSynthesis && typeof window.speechSynthesis.addEventListener ===
 
 setupDebugBridge();
 resetCurrentFlow(true);
+setQuestionFileGate(true);
+RicFaccWebcam.mountPicker(gateCameraPicker);
 logEvent('Profilo calibrato caricato: EAR 0.13, MAR 0.17, occhiali attivi.');
 setCommandState('In attesa');
 startRemoteSync();

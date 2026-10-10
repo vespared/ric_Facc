@@ -23,6 +23,7 @@ modalità di selezione per scrivere e farsi leggere frasi a voce.
 - [Requisiti](#requisiti)
 - [Installazione su Windows](#installazione-su-windows)
 - [Avvio e utilizzo](#avvio-e-utilizzo)
+- [Webcam USB esterna](#webcam-usb-esterna)
 - [Il comunicatore alfabetico](#il-comunicatore-alfabetico)
 - [Banca domande](#banca-domande)
 - [Struttura del progetto](#struttura-del-progetto)
@@ -121,7 +122,9 @@ I comandi remoti viaggiano sulla stessa rete Wi-Fi/LAN; **nessun dato esce dal P
 ## Requisiti
 
 - **Node.js 18+** (il backend non richiede pacchetti npm).
-- Un **browser moderno** con accesso alla **webcam** (consigliato Microsoft Edge o Google Chrome).
+- Un **browser moderno** (consigliato Microsoft Edge o Google Chrome).
+- Una **webcam esterna collegata via USB** al PC: l'app usa solo quella e **non ripiega sulla
+  webcam integrata** del portatile (vedi [Webcam USB esterna](#webcam-usb-esterna)).
 - Connessione a internet **al primo avvio**: alcune librerie frontend (MediaPipe, XLSX, Mammoth)
   sono caricate da CDN.
 - Per il pannello docente: tablet/telefono sulla **stessa rete Wi-Fi/LAN** del PC.
@@ -172,7 +175,31 @@ Con il server attivo:
 | Debug studente | `http://localhost:3000/debug.html` | Strumenti di diagnosi del tracking. |
 | Manuale | `http://localhost:3000/manuale.html` | Guida d'uso illustrata. |
 
-**Flusso d'esame (modalità solo domande):** lo studente accede direttamente al quiz (subito pronto con le domande attive, senza schermate d'attesa o diapositive) → il docente gestisce le domande dal pannello `teacher.html` (selezione materia dalla banca domande, lettura domanda, comandi remoti e inserimento nuove domande live) → lo studente risponde tramite riconoscimento facciale (bocca/occhi) o comandi remoti del docente.
+**Flusso d'esame (modalità solo domande):** sul PC studente compare la schermata **"Carica il file delle domande"** → con il pulsante **Carica file domande** si sceglie il file (`XLSX`, `DOCX`, `CSV`, `JSON` o `TXT`) → il quiz si apre, la webcam USB parte e la prima domanda viene letta → lo studente risponde tramite riconoscimento facciale (bocca/occhi) o comandi remoti del docente. Il docente gestisce il resto dal pannello `teacher.html` (selezione materia dalla banca domande, lettura domanda, comandi remoti e inserimento nuove domande live).
+
+Finché il file non è caricato il quiz è **bloccato**: i gesti del viso non muovono nulla e i comandi del
+tablet che agiscono sulle domande vengono rifiutati. Il quiz si sblocca anche se il docente pubblica
+un file dal pannello (`Pubblica file subito`) o riprende un test sospeso; **"Nuovo test"** riporta alla
+schermata iniziale.
+
+---
+
+## Webcam USB esterna
+
+Il tracciamento del viso usa **solo una webcam esterna collegata via USB**, non quella del portatile
+(modulo [`webcam-usb.js`](webcam-usb.js), condiviso da quiz e comunicatore):
+
+- La schermata iniziale mostra lo stato della webcam (*"Webcam USB esterna pronta: …"* oppure
+  *"Collega la webcam USB al PC"*) e si aggiorna da sola quando la webcam viene collegata o scollegata.
+- Con più webcam presenti viene scelta la prima **esterna**; le webcam integrate e virtuali
+  (nomi come *Integrated Camera*, *FaceTime*, *OBS Virtual Camera*, …) vengono scartate.
+- Se non c'è nessuna webcam esterna la webcam **non parte** e il pannello docente segnala
+  *"Webcam USB esterna non collegata"*: non c'è mai un ripiego silenzioso sulla webcam integrata.
+- Il browser non sa se una periferica è davvero USB: il riconoscimento si basa sul nome. Se una
+  webcam esterna viene scartata (o una integrata scelta) per via del nome, si può **scegliere a mano**
+  dal menu *Webcam da usare*: la scelta viene ricordata.
+- Se la webcam viene scollegata durante il quiz, il PC lo annuncia a voce e il pannello docente
+  mostra *"Webcam USB scollegata"*: dopo averla ricollegata basta premere **Avvia webcam**.
 
 ---
 
@@ -189,6 +216,7 @@ Con il server attivo:
   mette in pausa, **AUDIO ON/OFF** gestisce la voce. Un HUD mostra l'auto-inquadratura e i valori EAR/MAR.
 
 > Per la webcam serve un contesto sicuro: aprire la pagina via `http://localhost:3000/comunicatore.html`.
+> Anche qui si usa solo la [webcam USB esterna](#webcam-usb-esterna).
 
 ---
 
@@ -231,12 +259,12 @@ Ric_Facc/
 ├── index.html / app.js / style.css      # App studente (quiz a controllo facciale)
 ├── teacher.html / teacher.js / teacher.css  # Pannello docente in rete locale
 ├── server.js                            # Server Node.js + relay comandi (no dipendenze)
+├── webcam-usb.js                        # Selezione/avvio webcam esterna USB (quiz + comunicatore)
 ├── comunicatore.html / .css / .js       # Comunicatore alfabetico autonomo (AAC)
 ├── debug.html / debug.js                # Diagnostica tracking studente
 ├── teacher-debug.html / teacher-debug.js
 ├── manuale.html / manuale.css / manuale.js  # Manuale d'uso illustrato
 ├── domande/                             # Banca domande JSON, una per materia
-├── presentazione/                       # Diapositive d'esame (PNG + PDF)
 ├── installa-ric-facc.cmd / .ps1         # Installazione automatica Windows
 ├── avvia-ric-facc.cmd                   # Avvio kiosk a schermo intero
 ├── avvia-server-rete.cmd                # Avvio solo server + indirizzi LAN

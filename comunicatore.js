@@ -580,14 +580,14 @@ async function startCommunicator() {
         });
         faceMesh.onResults(onResults);
 
-        camera = new Camera(hudVideo, {
-            onFrame: async () => {
-                await faceMesh.send({ image: hudVideo });
-            },
-            width: 640,
-            height: 480
-        });
-        await camera.start();
+        // Webcam ESTERNA USB (webcam-usb.js): senza webcam esterna non si usa quella integrata.
+        if (camera) {
+            await camera.stop();
+            camera = null;
+        }
+        camera = await RicFaccWebcam.start(hudVideo, async () => {
+            await faceMesh.send({ image: hudVideo });
+        }, { width: 640, height: 480, onEnded: handleCameraDisconnected });
 
         commRunning = true;
         startOverlay.classList.add('is-hidden');
@@ -599,8 +599,21 @@ async function startCommunicator() {
         console.error('Errore webcam:', error);
         startBtn.disabled = false;
         startStatus.classList.add('is-error');
-        startStatus.textContent = 'Impossibile accedere alla webcam. Controlla i permessi del browser e riprova.';
+        startStatus.textContent = error && error.code === RicFaccWebcam.ERR_NO_EXTERNAL
+            ? 'Webcam USB esterna non rilevata. Collegala al PC e riprova.'
+            : 'Impossibile accedere alla webcam. Controlla i permessi del browser e riprova.';
     }
+}
+
+// La webcam USB e' stata scollegata mentre il comunicatore era in uso.
+function handleCameraDisconnected() {
+    camera = null;
+    commRunning = false;
+    startBtn.disabled = false;
+    startStatus.classList.add('is-error');
+    startStatus.textContent = 'Webcam USB scollegata. Ricollegala e premi Avvia.';
+    startOverlay.classList.remove('is-hidden');
+    setHudState('Webcam scollegata');
 }
 
 function exitCommunicator() {
@@ -641,6 +654,8 @@ refreshItalianVoice();
 if ('speechSynthesis' in window) {
     window.speechSynthesis.onvoiceschanged = refreshItalianVoice;
 }
+
+RicFaccWebcam.mountPicker(document.getElementById('commCameraPicker'));
 
 startBtn.addEventListener('click', startCommunicator);
 commExitBtn.addEventListener('click', exitCommunicator);

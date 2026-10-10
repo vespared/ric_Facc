@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ric_Facc | Quiz Accessibile</title>
 
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
         crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
@@ -26,6 +25,29 @@
 
 <body>
 
+    <!-- Schermata iniziale: il quiz si apre solo dopo aver caricato il file con le domande -->
+    <div class="exam-gate question-file-gate" id="questionFileGate" role="dialog" aria-modal="true"
+        aria-labelledby="questionFileGateTitle">
+        <div class="exam-gate__backdrop" aria-hidden="true"></div>
+        <div class="exam-gate__card">
+            <p class="exam-gate__eyebrow">Preparazione quiz</p>
+            <h2 class="exam-gate__title" id="questionFileGateTitle">Carica il file delle domande</h2>
+            <p class="exam-gate__body question-file-gate__body">
+                Collega la webcam USB, poi seleziona il file con le domande
+                (XLSX, DOCX, CSV, JSON o TXT). Il quiz si aprir&agrave; subito dopo il caricamento.
+            </p>
+
+            <div id="gateCameraPicker"></div>
+
+            <button type="button" id="gateLoadFileBtn" class="action-btn primary question-file-gate__btn">
+                Carica file domande
+            </button>
+            <input id="gateFileInput" class="file-input" type="file" accept=".xlsx,.docx,.csv,.json,.txt">
+            <p class="question-file-gate__status" id="gateFileStatus" role="status" aria-live="polite">
+                Nessun file caricato.
+            </p>
+        </div>
+    </div>
 
     <div class="app-shell app-shell--student">
         <main class="main-grid main-grid--quiz">
@@ -270,6 +292,7 @@
         </div>
     </div>
 
+    <script src="webcam-usb.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

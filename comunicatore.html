@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Comunicatore | Ric_Facc</title>
 
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -33,8 +32,9 @@
                 <li><strong>Apri la bocca</strong> per scorrere i riquadri</li>
                 <li><strong>Chiudi gli occhi</strong> (circa 1 secondo) per scegliere</li>
             </ul>
+            <div id="commCameraPicker"></div>
             <button id="commStartBtn" class="comm-start__btn" type="button">&#9654; Avvia comunicatore</button>
-            <p id="commStartStatus" class="comm-start__status">Serve la webcam. Concedi il permesso quando richiesto.</p>
+            <p id="commStartStatus" class="comm-start__status">Serve la webcam USB esterna. Concedi il permesso quando richiesto.</p>
         </div>
     </div>
 
@@ -73,6 +73,7 @@
         </div>
     </div>
 
+    <script src="webcam-usb.js"></script>
     <script src="comunicatore.js"></script>
 </body>
 

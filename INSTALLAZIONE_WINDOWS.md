@@ -2,6 +2,11 @@
 
 Questo progetto puo essere avviato su un PC Windows anche se Node.js non e ancora installato.
 
+## Hardware richiesto
+
+- Una **webcam esterna collegata via USB** al PC: Ric_Facc usa solo quella e non la webcam integrata del portatile.
+  Collegala prima di aprire il quiz; la schermata iniziale mostra se e' stata rilevata.
+
 ## File da usare
 
 - `installa-ric-facc.cmd`: prima installazione completa
@@ -31,7 +36,7 @@ Per usare il programma in seguito basta aprire:
 
 Quando il server parte, nella finestra di comando mostra:
 
-- `http://localhost:3000/` per il quiz studente sul PC
+- `http://localhost:3000/` per il quiz studente sul PC (si apre dopo aver caricato il file delle domande con il pulsante **Carica file domande**)
 - `http://localhost:3000/teacher.html` per il pannello docente locale
 - gli indirizzi LAN da usare su tablet o telefono nella stessa rete Wi-Fi
 

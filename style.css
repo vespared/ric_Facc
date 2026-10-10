@@ -1622,6 +1622,40 @@ select {
     }
 }
 
+/* --- Gate caricamento file domande (schermata iniziale studente) --- */
+.question-file-gate .exam-gate__card {
+    max-height: 100%;
+    overflow-y: auto;
+    padding: clamp(28px, 4vw, 48px) clamp(24px, 5vw, 56px);
+}
+
+.question-file-gate .exam-gate__title {
+    margin-bottom: 16px;
+}
+
+.question-file-gate__body {
+    margin-bottom: 24px;
+    font-size: clamp(1.05rem, 1.5vw, 1.25rem);
+    line-height: 1.6;
+}
+
+.question-file-gate__btn {
+    width: 100%;
+    padding: 20px 24px;
+    border-radius: 18px;
+    font-size: clamp(1.2rem, 2vw, 1.5rem);
+}
+
+.question-file-gate__status {
+    margin-top: 16px;
+    font-size: 1.05rem;
+    color: var(--muted);
+}
+
+.question-file-gate__status.is-error {
+    color: var(--red);
+}
+
 /* Modale sessione sospesa per lo studente */
 .student-modal-backdrop {
     position: fixed;
