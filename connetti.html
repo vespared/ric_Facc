@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ric_Facc | Connessione Docente</title>
+    <title>Mimika | Connessione Docente</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -280,6 +280,26 @@
             line-height: 1.35;
             text-align: left;
         }
+
+        .qr-footer-credit {
+            margin-top: 6px;
+            padding-top: 12px;
+            border-top: 1px solid var(--line);
+            font-size: 0.76rem;
+            color: var(--muted);
+            line-height: 1.4;
+        }
+
+        .qr-footer-credit .qr-credit-name {
+            font-weight: 800;
+            color: var(--cyan);
+            margin-right: 4px;
+            letter-spacing: 0.06em;
+        }
+
+        .qr-footer-credit .qr-credit-text {
+            color: rgba(245, 248, 255, 0.9);
+        }
     </style>
 </head>
 
@@ -288,7 +308,7 @@
         <header class="header-bar">
             <span class="brand-badge">
                 <span class="status-dot"></span>
-                Ric_Facc Rete
+                Mimika Rete
             </span>
             <span class="connection-status" id="liveStatusLabel">
                 In attesa docente...
@@ -326,6 +346,11 @@
         <aside class="hint-block">
             💡 <strong>Promemoria:</strong> PC e tablet devono essere collegati alla <strong>stessa rete Wi-Fi</strong>.
         </aside>
+
+        <footer class="qr-footer-credit">
+            <span class="qr-credit-name">MIMIKA</span>
+            <span class="qr-credit-text">&bull; Un programma ideato e gestito dal dott. Carlo Santoro</span>
+        </footer>
     </div>
 
     <script src="qrcode.min.js"></script>

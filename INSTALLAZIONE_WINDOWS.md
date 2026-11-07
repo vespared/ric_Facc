@@ -1,10 +1,11 @@
-# Installazione Windows
+# Installazione Windows — Mimika
+> **Un programma ideato e gestito dal dott. Carlo Santoro**
 
 Questo progetto puo essere avviato su un PC Windows anche se Node.js non e ancora installato.
 
 ## Hardware richiesto
 
-- Una **webcam esterna collegata via USB** al PC: Ric_Facc usa solo quella e non la webcam integrata del portatile.
+- Una **webcam esterna collegata via USB** al PC: Mimika usa solo quella e non la webcam integrata del portatile.
   Collegala prima di aprire il quiz; la schermata iniziale mostra se e' stata rilevata.
 
 ## File da usare
@@ -22,7 +23,7 @@ Questo progetto puo essere avviato su un PC Windows anche se Node.js non e ancor
    - controlla se Node.js LTS e presente;
    - se manca, lo installa da internet con `winget` oppure con installer MSI ufficiale;
    - apre la porta `3000` nel firewall per le reti private;
-   - crea un collegamento `Ric_Facc` sul Desktop;
+   - crea un collegamento `Mimika` sul Desktop;
    - avvia il server locale in una nuova finestra.
 
 ## Avvio quotidiano
@@ -30,7 +31,7 @@ Questo progetto puo essere avviato su un PC Windows anche se Node.js non e ancor
 Per usare il programma in seguito basta aprire:
 
 - `avvia-ric-facc.cmd`
-- oppure il collegamento `Ric_Facc` creato sul Desktop
+- oppure il collegamento `Mimika` creato sul Desktop
 
 ## URL utili
 

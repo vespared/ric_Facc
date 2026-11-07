@@ -461,3 +461,26 @@ button { font: inherit; cursor: pointer; }
 
 .comm-hud__metrics { color: #7d8bb0; font-size: 11px; }
 .comm-hud__metrics strong { color: #D7E2FB; }
+
+.comm-credit-strip {
+    position: fixed;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 6px 16px;
+    background: rgba(10, 19, 38, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    font-size: 12px;
+    color: #9cb3d9;
+    letter-spacing: 0.03em;
+    z-index: 100;
+    pointer-events: none;
+    backdrop-filter: blur(8px);
+}
+
+.comm-credit-strip strong {
+    color: #2de2e6;
+    letter-spacing: 0.05em;
+}
+

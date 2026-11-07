@@ -686,6 +686,62 @@ select {
     box-shadow: 0 0 0 1px rgba(255, 209, 102, 0.18), 0 16px 34px rgba(255, 209, 102, 0.12);
 }
 
+/* --- Immagine della domanda: affiancata al testo su schermi larghi, sotto il testo su quelli stretti --- */
+.question-card.has-image {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(200px, 42%);
+    gap: 14px 20px;
+    align-items: center;
+}
+
+.question-card.has-image .command-strip {
+    grid-column: 1 / -1;
+}
+
+.question-media {
+    margin: 0;
+    padding: 8px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.94);
+    border: 2px solid transparent;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.question-media[hidden],
+.question-media__img[hidden],
+.question-media__fallback[hidden] {
+    display: none !important;
+}
+
+.question-media__img {
+    display: block;
+    width: 100%;
+    max-height: clamp(150px, 30vh, 320px);
+    object-fit: contain;
+    border-radius: 10px;
+}
+
+.question-media__fallback {
+    color: #0b1b33;
+    font-size: 1rem;
+    line-height: 1.35;
+    text-align: center;
+    padding: 12px;
+}
+
+@media (max-width: 720px) {
+    .question-card.has-image {
+        grid-template-columns: 1fr;
+    }
+
+    .question-media__img {
+        max-height: clamp(130px, 26vh, 240px);
+    }
+}
+
 .question-text.is-being-read,
 .choice-text.is-being-read,
 .instruction-bar strong.is-being-read {
@@ -843,46 +899,168 @@ select {
 .choice-card {
     position: relative;
     overflow: hidden;
-    border: none;
-    border-radius: 20px;
+    border: 3px solid transparent;
+    border-radius: 22px;
     min-height: 108px;
-    padding: 14px 16px 16px;
+    padding: 16px 18px 18px;
     text-align: left;
     color: #09111f;
     cursor: pointer;
-    transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+    transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.4, 1.1),
+                box-shadow 0.22s ease,
+                filter 0.22s ease,
+                border-color 0.22s ease,
+                opacity 0.22s ease;
     background: var(--choice-bg, linear-gradient(135deg, #57d6ff, #246dff));
     box-shadow: 0 16px 28px rgba(0, 0, 0, 0.22);
 }
 
+/* Badge di stato selezione in alto a destra nella card */
+.choice-selection-badge {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    z-index: 4;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0;
+    transform: translateY(-4px) scale(0.9);
+    transition: opacity 0.22s ease, transform 0.22s ease;
+    pointer-events: none;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.choice-selection-badge .choice-badge-icon {
+    font-size: 0.88rem;
+    line-height: 1;
+}
+
 .choice-card.is-being-read {
-    filter: saturate(1.04) brightness(1.03);
-    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5), 0 0 26px rgba(255, 255, 255, 0.14), 0 16px 28px rgba(0, 0, 0, 0.22);
+    filter: saturate(1.06) brightness(1.04);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.6), 0 0 28px rgba(255, 255, 255, 0.2), 0 16px 28px rgba(0, 0, 0, 0.24);
 }
 
 .choice-card:hover {
-    transform: translateY(-3px);
+    transform: translateY(-4px);
 }
 
+/* Focus normale durante lo scorrimento */
 .choice-card.is-focused {
-    transform: translateY(-4px) scale(1.01);
-    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.78), 0 18px 32px rgba(0, 0, 0, 0.28);
+    transform: translateY(-6px) scale(1.025);
+    z-index: 5;
+    border-color: rgba(255, 255, 255, 0.95);
+    box-shadow:
+        0 0 0 4px #ffffff,
+        0 0 0 8px rgba(255, 255, 255, 0.35),
+        0 0 28px rgba(255, 255, 255, 0.65),
+        0 20px 38px rgba(0, 0, 0, 0.4);
 }
 
+.choice-card.is-focused .choice-letter {
+    background: #ffffff;
+    color: #09111f;
+    box-shadow: 0 0 16px rgba(255, 255, 255, 0.8);
+    transform: scale(1.08);
+}
+
+/* IN SELEZIONE ATTIVA (Occhi chiusi in preselect) - Alta visibilità */
+.choice-card.is-selecting {
+    transform: translateY(-8px) scale(1.045);
+    z-index: 7;
+    border-color: #ffd166;
+    box-shadow:
+        0 0 0 5px #ffd166,
+        0 0 0 10px rgba(255, 209, 102, 0.45),
+        0 0 38px rgba(255, 209, 102, 0.85),
+        0 24px 48px rgba(0, 0, 0, 0.5);
+    animation: selecting-card-pulse 0.9s ease-in-out infinite alternate;
+}
+
+.choice-card.is-selecting .choice-selection-badge {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    background: #09111f;
+    color: #ffd166;
+    border: 1px solid rgba(255, 209, 102, 0.8);
+}
+
+.choice-card.is-selecting .choice-letter {
+    background: #ffd166;
+    color: #09111f;
+    box-shadow: 0 0 20px rgba(255, 209, 102, 0.9);
+    transform: scale(1.12);
+}
+
+@keyframes selecting-card-pulse {
+    0% {
+        box-shadow:
+            0 0 0 5px #ffd166,
+            0 0 0 8px rgba(255, 209, 102, 0.35),
+            0 0 24px rgba(255, 209, 102, 0.65),
+            0 20px 40px rgba(0, 0, 0, 0.42);
+    }
+    100% {
+        box-shadow:
+            0 0 0 6px #ffd166,
+            0 0 0 13px rgba(255, 209, 102, 0.6),
+            0 0 46px rgba(255, 209, 102, 0.95),
+            0 28px 54px rgba(0, 0, 0, 0.52);
+    }
+}
+
+/* RISPOSTA SELEZIONATA (Fase di conferma safe check) - Risoluzione e risalto massimo */
+.choice-card.is-selected {
+    transform: translateY(-8px) scale(1.045);
+    z-index: 7;
+    border-color: #2de2e6;
+    box-shadow:
+        0 0 0 6px #2de2e6,
+        0 0 0 11px rgba(45, 226, 230, 0.45),
+        0 0 40px rgba(45, 226, 230, 0.85),
+        0 26px 52px rgba(0, 0, 0, 0.5);
+}
+
+.choice-card.is-selected .choice-selection-badge {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    background: #09111f;
+    color: #2de2e6;
+    border: 1px solid rgba(45, 226, 230, 0.85);
+}
+
+.choice-card.is-selected .choice-letter {
+    background: #2de2e6;
+    color: #09111f;
+    box-shadow: 0 0 22px rgba(45, 226, 230, 0.9);
+    transform: scale(1.12);
+}
+
+/* Card non selezionate durante il safe check: forte contrasto */
 .choice-card.is-dimmed {
-    filter: saturate(0.45) brightness(0.7);
+    filter: saturate(0.32) brightness(0.62);
+    opacity: 0.38;
+    transform: scale(0.97);
 }
 
 .choice-card.is-confirmed {
-    box-shadow: 0 0 0 4px rgba(113, 247, 159, 0.85), 0 22px 36px rgba(113, 247, 159, 0.22);
+    box-shadow: 0 0 0 5px rgba(113, 247, 159, 0.9), 0 0 28px rgba(113, 247, 159, 0.5), 0 22px 36px rgba(0, 0, 0, 0.3);
 }
 
 .choice-card.is-correct {
     background: linear-gradient(135deg, #71f79f, #35bb74);
+    box-shadow: 0 0 0 4px #71f79f, 0 18px 36px rgba(43, 209, 120, 0.35);
 }
 
 .choice-card.is-wrong {
     background: linear-gradient(135deg, #ff8e8e, #ff5f7a);
+    box-shadow: 0 0 0 4px #ff5f7a, 0 18px 36px rgba(255, 95, 122, 0.35);
 }
 
 .answer-feedback {
@@ -1065,15 +1243,18 @@ select {
     left: 0;
     bottom: 0;
     width: 100%;
-    height: 10px;
-    background: rgba(255, 255, 255, 0.24);
+    height: 14px;
+    background: linear-gradient(90deg, #ffd166, #2de2e6);
+    box-shadow: 0 0 14px rgba(255, 209, 102, 0.85);
     transform-origin: left center;
     transform: scaleX(var(--progress, 0));
+    z-index: 3;
+    transition: transform 0.05s linear;
 }
 
 .choice-content {
     position: relative;
-    z-index: 1;
+    z-index: 2;
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     gap: 12px;
@@ -1081,14 +1262,15 @@ select {
 }
 
 .choice-letter {
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
     display: grid;
     place-items: center;
     border-radius: 14px;
-    font-size: 1rem;
-    font-weight: 700;
-    background: rgba(255, 255, 255, 0.35);
+    font-size: 1.15rem;
+    font-weight: 800;
+    background: rgba(255, 255, 255, 0.4);
+    transition: transform 0.2s ease, background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .choice-text {
@@ -1833,7 +2015,8 @@ select {
 .completed-actions {
     display: flex;
     justify-content: center;
-    gap: 16px;
+    gap: 12px;
+    flex-wrap: wrap;
 }
 
 .completed-print-btn {
@@ -1841,14 +2024,35 @@ select {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 16px 28px;
-    font-size: 1.15rem;
+    padding: 12px 22px;
+    font-size: 1rem;
     font-weight: 700;
-    border-radius: 16px;
+    border-radius: 14px;
+    cursor: pointer;
+    border: none;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.completed-print-btn.primary {
     background: linear-gradient(135deg, #2de2e6, #246bff);
     color: #060b14;
     box-shadow: 0 10px 25px rgba(45, 226, 230, 0.35);
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.completed-print-btn.secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.completed-print-btn.secondary:hover {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.completed-print-btn.ghost {
+    background: transparent;
+    color: rgba(255, 255, 255, 0.7);
+    border: 1px dashed rgba(255, 255, 255, 0.25);
 }
 
 .completed-print-btn:hover {
@@ -1856,8 +2060,96 @@ select {
     box-shadow: 0 14px 30px rgba(45, 226, 230, 0.45);
 }
 
+.student-export-status {
+    padding: 10px 16px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: inline-block;
+}
+
 @keyframes fadeInModal {
     from { opacity: 0; transform: scale(0.96); }
     to { opacity: 1; transform: scale(1); }
 }
+
+/* ============================================================
+   MIMIKA BRANDING & FOOTER CREDITS
+   "Un programma ideato e gestito dal dott. Carlo Santoro"
+   ============================================================ */
+.app-branding-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 24px;
+    padding: 14px 20px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    color: rgba(226, 232, 240, 0.85);
+    font-size: 0.92rem;
+    text-align: center;
+    letter-spacing: 0.02em;
+    backdrop-filter: blur(8px);
+}
+
+.app-branding-footer .brand-name {
+    font-weight: 800;
+    color: #38bdf8;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.app-branding-footer .credit-divider {
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 0.8rem;
+}
+
+.app-branding-footer .credit-text {
+    font-weight: 500;
+    color: #e2e8f0;
+}
+
+.gate-brand-banner {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgba(45, 226, 230, 0.15), rgba(79, 70, 229, 0.2));
+    border: 1px solid rgba(45, 226, 230, 0.4);
+    margin-bottom: 12px;
+}
+
+.gate-brand-logo {
+    font-size: 1.15rem;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    color: #38bdf8;
+    text-transform: uppercase;
+}
+
+.gate-brand-tag {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #ffd166;
+    padding-left: 6px;
+    border-left: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.gate-footer-credit {
+    margin-top: 18px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.65);
+    font-weight: 500;
+    text-align: center;
+}
+
 

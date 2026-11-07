@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ric_Facc | Pannello docente</title>
+    <title>Mimika | Pannello docente</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,7 +23,7 @@
         <!-- Header di contesto sessione: Studente, Materia, Cartella PC -->
         <header class="teacher-top-header">
             <div class="teacher-header-brand">
-                <span class="teacher-logo-badge">RIC_FACC</span>
+                <span class="teacher-logo-badge">MIMIKA</span>
                 <span class="teacher-role-tag">Pannello Docente</span>
             </div>
 
@@ -39,6 +39,11 @@
                 <div class="context-item context-folder" title="Percorso cartella sul PC">
                     <span class="context-label">Cartella risultati:</span>
                     <code id="currentStudentFolderDisplay">studenti/Martinelli</code>
+                </div>
+                <div class="context-item context-save-action">
+                    <button type="button" id="teacherHeaderSaveQuestionnaireBtn" class="action-btn secondary teacher-btn-xs" title="Salva in ogni momento il questionario posto allo studente">
+                        📁 Salva questionario
+                    </button>
                 </div>
             </div>
         </header>
@@ -89,12 +94,20 @@
                         </article>
                     </div>
 
+                    <div class="teacher-questionnaire-bar">
+                        <button type="button" id="teacherOpenSaveQuestionnaireModalBtn" class="action-btn primary teacher-save-q-btn" title="Salva in qualsiasi momento il questionario posto allo studente in una cartella a tua scelta">
+                            📁 Salva questionario in cartella...
+                        </button>
+                        <span class="questionnaire-info-pill" id="teacherQuestionnaireInfoBadge">Questionario: in attesa</span>
+                    </div>
+
                     <article class="question-card teacher-question-card">
                         <p class="question-label">Domanda attuale</p>
                         <h2 id="teacherQuestionTitle">Quiz non ancora collegato</h2>
                         <p class="question-text teacher-question-text" id="teacherQuestionPrompt">
                             Apri prima il quiz del ragazzo sul PC tramite server locale e poi usa questa pagina dal tablet.
                         </p>
+                        <img class="teacher-question-image" id="teacherQuestionImage" alt="Immagine della domanda" hidden>
                     </article>
 
                     <div class="teacher-choice-list" id="teacherChoiceList"></div>
@@ -154,10 +167,14 @@
                         <p id="completedTestMessage" class="completed-alert-text">
                             I risultati totali sono stati salvati nella cartella dello studente sul PC.
                         </p>
-                        <div class="teacher-submit-grid">
-                            <button type="button" id="teacherPrintCompletedBtn" class="action-btn primary">&#128438; Stampa / Salva in PDF</button>
-                            <button type="button" id="teacherDismissCompletedBtn" class="action-btn secondary">Chiudi avviso</button>
+                        <div class="teacher-submit-grid teacher-completed-actions" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                            <button type="button" id="teacherSaveDesktopCompletedBtn" class="action-btn primary" title="Salva direttamente il file PDF sul Desktop del PC server">&#128190; Salva PDF su Desktop Server</button>
+                            <button type="button" id="teacherOpenStudentCompletedBtn" class="action-btn secondary" title="Apri automaticamente il PDF nel browser aperto dello studente">&#128187; Apri PDF nel Browser Studente</button>
+                            <a id="teacherDownloadCompletedLink" href="#" target="_blank" class="action-btn secondary" style="display:inline-flex; align-items:center; text-decoration:none;" download>&#128229; Scarica PDF</a>
+                            <button type="button" id="teacherPrintCompletedBtn" class="action-btn ghost">&#128438; Stampa Scheda</button>
+                            <button type="button" id="teacherDismissCompletedBtn" class="action-btn ghost">Chiudi avviso</button>
                         </div>
+                        <div id="teacherExportResultStatus" style="margin-top: 10px; font-weight: 700; font-size: 0.9rem; color: #22c55e;" hidden></div>
                     </div>
                 </div>
 
@@ -329,7 +346,16 @@
                         <button type="button" id="teacherDownloadCsvTemplateBtn" class="action-btn secondary teacher-btn-sm">
                             📥 Modello CSV (.csv)
                         </button>
+                        <a class="action-btn secondary teacher-btn-sm" href="modello-domande-quiz-immagini.xlsx"
+                            download="modello-domande-quiz-immagini.xlsx">
+                            🖼️ Modello con immagini (.xlsx)
+                        </a>
                     </div>
+                    <p class="teacher-excel-hint">
+                        Per aggiungere un'immagine a una domanda: in Excel usa Inserisci &gt; Immagini sulla riga della
+                        domanda (colonna Immagine) oppure scrivi il nome di un file presente nella cartella
+                        <code>immagini</code>.
+                    </p>
 
                     <!-- Anteprima domande caricate da Excel -->
                     <div id="teacherExcelPreviewArea" class="teacher-excel-preview-area" hidden>
@@ -390,6 +416,11 @@
                                 placeholder="Scrivi qui la domanda da inviare allo studente"></textarea>
                         </label>
 
+                        <label class="teacher-field">
+                            <span>Immagine <small>(facoltativa: PNG, JPG, GIF o WEBP)</small></span>
+                            <input id="teacherQuestionImageInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp">
+                        </label>
+
                         <label class="teacher-field" id="teacherFieldA">
                             <span>Risposta A *</span>
                             <input id="teacherOptionAInput" type="text" placeholder="Prima risposta">
@@ -418,8 +449,129 @@
                 </div>
             </section>
         </main>
+
+        <footer class="teacher-branding-footer">
+            <span class="brand-name">MIMIKA</span>
+            <span class="credit-divider">&bull;</span>
+            <span class="credit-text">Un programma ideato e gestito dal dott. Carlo Santoro</span>
+        </footer>
     </div>
 
+    <!-- Modal Salva Questionario in Cartella a Scelta -->
+    <div id="saveQuestionnaireModal" class="teacher-modal-backdrop" hidden>
+        <div class="teacher-modal-card save-questionnaire-modal" role="dialog" aria-labelledby="saveModalTitle" aria-modal="true">
+            <div class="teacher-modal-header" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
+                <div>
+                    <h3 id="saveModalTitle" class="teacher-modal-title" style="margin-top:0;">📁 Salva Questionario Studente</h3>
+                    <p class="teacher-modal-desc">Salva in ogni momento il questionario posto allo studente nella cartella che preferisci</p>
+                </div>
+                <button type="button" id="closeSaveQuestionnaireModalBtn" class="action-btn ghost teacher-btn-xs" aria-label="Chiudi" style="font-size:1.4rem; padding: 2px 10px; line-height:1; min-width:auto;">&times;</button>
+            </div>
+
+            <div class="teacher-modal-body">
+                <!-- Riepilogo questionario attivo -->
+                <div class="save-modal-summary">
+                    <div class="save-summary-pill">
+                        <span>Studente:</span>
+                        <strong id="modalSummaryStudent">Martinelli</strong>
+                    </div>
+                    <div class="save-summary-pill">
+                        <span>Materia:</span>
+                        <strong id="modalSummarySubject">Italiano</strong>
+                    </div>
+                    <div class="save-summary-pill">
+                        <span>Domande nel quiz:</span>
+                        <strong id="modalSummaryCount">0</strong>
+                    </div>
+                    <div class="save-summary-pill">
+                        <span>Avanzamento:</span>
+                        <strong id="modalSummaryProgress">-</strong>
+                    </div>
+                </div>
+
+                <!-- Selezione formato file -->
+                <div class="save-modal-section">
+                    <label class="save-section-label">Formato del file da salvare:</label>
+                    <div class="save-format-grid">
+                        <label class="format-card is-active">
+                            <input type="radio" name="modalQuestionnaireFormat" value="xlsx" checked>
+                            <span class="format-title">📊 Excel (.xlsx)</span>
+                            <span class="format-subtitle">Compatibile con l'importazione del quiz</span>
+                        </label>
+                        <label class="format-card">
+                            <input type="radio" name="modalQuestionnaireFormat" value="csv">
+                            <span class="format-title">📑 CSV (.csv)</span>
+                            <span class="format-subtitle">Foglio di calcolo universale</span>
+                        </label>
+                        <label class="format-card">
+                            <input type="radio" name="modalQuestionnaireFormat" value="json">
+                            <span class="format-title">⚙️ JSON (.json)</span>
+                            <span class="format-subtitle">Dati completi con domande e risposte</span>
+                        </label>
+                        <label class="format-card">
+                            <input type="radio" name="modalQuestionnaireFormat" value="all">
+                            <span class="format-title">📦 Tutti i formati</span>
+                            <span class="format-subtitle">Salva sia .xlsx, .csv che .json</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Nome file desiderato -->
+                <div class="save-modal-section">
+                    <label class="save-section-label" for="saveQuestionnaireFileNameInput">Nome del file:</label>
+                    <input type="text" id="saveQuestionnaireFileNameInput" class="teacher-text-input" placeholder="Es. Questionario_Italiano_Martinelli">
+                </div>
+
+                <!-- Destinazione: Scegli cartella del computer o server -->
+                <div class="save-modal-section">
+                    <label class="save-section-label">Destinazione di salvataggio:</label>
+
+                    <!-- Opzione 1: Scegli cartella sul dispositivo -->
+                    <div class="save-destination-card">
+                        <div class="save-dest-head">
+                            <strong class="save-dest-title">💻 Opzione A: Scegli cartella tramite Esplora File (Browser / PC)</strong>
+                            <p class="save-dest-desc">Apre la finestra di sistema per scegliere qualsiasi cartella del computer (Desktop, Documenti, chiavetta USB, rete, ecc.)</p>
+                        </div>
+                        <button type="button" id="modalSaveToDeviceBtn" class="action-btn primary teacher-btn-full">
+                            📂 Scegli cartella e salva file...
+                        </button>
+                    </div>
+
+                    <!-- Opzione 2: Salva sul PC server in un percorso a scelta -->
+                    <div class="save-destination-card" style="margin-top: 12px;">
+                        <div class="save-dest-head">
+                            <strong class="save-dest-title">🖥️ Opzione B: Salva in una cartella specifica sul PC Server</strong>
+                            <p class="save-dest-desc">Ideale se usi un tablet o vuoi salvare direttamente in una cartella specifica sul computer locale del docente</p>
+                        </div>
+
+                        <div class="server-preset-buttons">
+                            <button type="button" class="preset-folder-btn" data-preset="desktop">🖥️ Desktop</button>
+                            <button type="button" class="preset-folder-btn" data-preset="documents">📁 Documenti</button>
+                            <button type="button" class="preset-folder-btn" data-preset="student">👤 Cartella Studente</button>
+                            <button type="button" class="preset-folder-btn" data-preset="archive">📚 Questionari Salvati</button>
+                        </div>
+
+                        <div style="margin-top: 10px;">
+                            <label class="save-field-sublabel" for="modalServerFolderPathInput">Percorso cartella sul PC Server:</label>
+                            <input type="text" id="modalServerFolderPathInput" class="teacher-text-input" placeholder="Es. C:\Scuola\Verifiche oppure seleziona un tasto rapido sopra">
+                        </div>
+
+                        <button type="button" id="modalSaveToServerBtn" class="action-btn secondary teacher-btn-full" style="margin-top: 10px;">
+                            💾 Salva nella cartella del server PC
+                        </button>
+                    </div>
+                </div>
+
+                <div id="saveModalStatusMessage" class="save-modal-feedback" hidden></div>
+            </div>
+
+            <div class="teacher-modal-footer" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid rgba(136,176,255,0.2); padding-top:16px;">
+                <button type="button" id="dismissSaveQuestionnaireModalBtn" class="action-btn ghost">Chiudi</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="question-images.js"></script>
     <script src="teacher.js"></script>
 </body>
 

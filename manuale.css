@@ -448,3 +448,21 @@ code {
         break-inside: avoid;
     }
 }
+
+.manual-branding-footer {
+    margin-top: 32px;
+    padding: 20px 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.95rem;
+}
+
+.manual-branding-footer strong {
+    color: var(--primary-strong);
+    letter-spacing: 0.06em;
+}
+

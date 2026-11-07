@@ -1,4 +1,5 @@
-# Manuale Ric_Facc - handoff Figma
+# Manuale Mimika - handoff Figma
+> **Mimika — Un programma ideato e gestito dal dott. Carlo Santoro**
 
 Questo file descrive come ricreare il manuale in Figma con una struttura pensata prima per smartphone in vista verticale.
 

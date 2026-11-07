@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Comunicatore | Ric_Facc</title>
+    <title>Comunicatore | Mimika</title>
 
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 
@@ -35,6 +35,9 @@
             <div id="commCameraPicker"></div>
             <button id="commStartBtn" class="comm-start__btn" type="button">&#9654; Avvia comunicatore</button>
             <p id="commStartStatus" class="comm-start__status">Serve la webcam USB esterna. Concedi il permesso quando richiesto.</p>
+            <p style="margin-top: 14px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 13px; color: #9cb3d9;">
+                Mimika &bull; Un programma ideato e gestito dal dott. Carlo Santoro
+            </p>
         </div>
     </div>
 
@@ -70,6 +73,10 @@
                 <span id="commHudState" class="comm-hud__state">In attesa</span>
                 <span class="comm-hud__metrics">EAR <strong id="commHudEar">0.000</strong> &middot; MAR <strong id="commHudMar">0.000</strong></span>
             </div>
+        </div>
+
+        <div class="comm-credit-strip">
+            <strong>MIMIKA</strong> &bull; Un programma ideato e gestito dal dott. Carlo Santoro
         </div>
     </div>
 

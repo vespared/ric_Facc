@@ -1,6 +1,7 @@
-# Ric_Facc — Quiz accessibile a controllo facciale
+# Mimika — Quiz accessibile a controllo facciale
+> **Un programma ideato e gestito dal dott. Carlo Santoro**
 
-**Ric_Facc** è una web app didattica accessibile che permette a uno studente con disabilità
+**Mimika** è una web app didattica accessibile che permette a uno studente con disabilità
 motoria di **rispondere a un quiz in stile Kahoot usando solo i movimenti del viso**, senza
 mouse, tastiera o touch. Il riconoscimento avviene in tempo reale nel browser tramite
 **face-tracking MediaPipe**: aprire la bocca scorre le risposte, chiudere gli occhi le seleziona.
@@ -140,13 +141,13 @@ Il progetto è pensato per funzionare su Windows anche partendo da zero.
 1. Copia l'intera cartella del progetto sul PC.
 2. Esegui **`installa-ric-facc.cmd`** e conferma la richiesta di amministratore.
    Lo script: verifica/installa Node.js LTS (via `winget` o MSI ufficiale), apre la porta `3000`
-   nel firewall per le reti private, crea un collegamento `Ric_Facc` sul Desktop e avvia il server.
+   nel firewall per le reti private, crea un collegamento `Mimika` sul Desktop e avvia il server.
 
 Dettagli completi in [`INSTALLAZIONE_WINDOWS.md`](INSTALLAZIONE_WINDOWS.md).
 
 ### Avvio quotidiano
 
-- **`avvia-ric-facc.cmd`** (o il collegamento `Ric_Facc` sul Desktop): avvia il server e apre la
+- **`avvia-ric-facc.cmd`** (o il collegamento `Mimika` sul Desktop): avvia il server e apre la
   pagina studente **a schermo intero in modalità kiosk** (Edge). Per chiudere: `Alt+F4`.
 - **`avvia-server-rete.cmd`**: avvia il server in rete locale e apre automaticamente un **riquadro grafico dedicato con il QR Code** per far inquadrare e collegare il docente con cellulare o tablet. **Appena il docente inquadra il QR Code, la pagina studente (`http://localhost:3000/`) si apre automaticamente nel browser del PC**.
 - **`apri-qr.cmd`**: apre in qualsiasi momento la finestra grafica con il QR code docente.
@@ -250,16 +251,40 @@ Formato di ogni domanda:
 - Dal pannello docente è possibile **scrivere una domanda al volo** oppure **importare** un file
   `XLSX`, `CSV`, `DOCX`, `TXT` o `JSON` e pubblicarlo subito o metterlo in coda.
 
+### Domande con immagini
+
+Ogni domanda può avere **un'immagine** (PNG, JPG, GIF o WEBP, fino a 10 MB), mostrata accanto al
+testo della domanda. Se l'immagine non si carica compare l'avviso "Immagine non disponibile".
+
+| Dove | Come indicare l'immagine |
+|------|--------------------------|
+| **XLSX** | Inserisci l'immagine nella riga della domanda (*Inserisci > Immagini*, di preferenza "sopra le celle"; viene letta anche l'opzione "nella cella" di Excel 365) oppure scrivi un nome file nella colonna `Immagine`. |
+| **CSV / TXT** | Colonna o chiave `Immagine` con il nome del file (`gatto.png`). |
+| **JSON** | Campo `image` (`"immagini/gatto.png"` o URL `http(s)`). |
+| **Domanda al volo** | Campo *Immagine* nel pannello docente. |
+
+- I file indicati **per nome** devono stare nella cartella [`immagini/`](immagini/) (creata dal server).
+  Le immagini incorporate in un XLSX o caricate dal pannello vengono invece **salvate lì
+  automaticamente** con un nome basato sul contenuto (la stessa immagine non viene duplicata) e le
+  domande portano solo il percorso: per questo non servono limiti di dimensione particolari nel file.
+- Un file DOCX non può contenere immagini incorporate: usa il nome file come per CSV/TXT.
+- Modello pronto con 3 domande illustrate: [`modello-domande-quiz-immagini.xlsx`](modello-domande-quiz-immagini.xlsx)
+  (scaricabile anche dal pannello docente). Il suo foglio *Istruzioni* spiega le colonne.
+- Se un file ha più immagini sulla stessa riga viene usata la prima; immagini non associate a una
+  domanda o nomi file inesistenti vengono segnalati nello stato di caricamento e nel log eventi.
+
 ---
 
 ## Struttura del progetto
 
 ```
-Ric_Facc/
+Mimika/
 ├── index.html / app.js / style.css      # App studente (quiz a controllo facciale)
 ├── teacher.html / teacher.js / teacher.css  # Pannello docente in rete locale
 ├── server.js                            # Server Node.js + relay comandi (no dipendenze)
 ├── webcam-usb.js                        # Selezione/avvio webcam esterna USB (quiz + comunicatore)
+├── question-images.js                   # Immagini nelle domande (lettura da XLSX, upload, percorsi)
+├── immagini/                            # Immagini delle domande (create/riempite dal server)
 ├── comunicatore.html / .css / .js       # Comunicatore alfabetico autonomo (AAC)
 ├── debug.html / debug.js                # Diagnostica tracking studente
 ├── teacher-debug.html / teacher-debug.js

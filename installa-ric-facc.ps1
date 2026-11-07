@@ -174,7 +174,7 @@ function Ensure-FirewallRule {
 }
 
 function Ensure-DesktopShortcut {
-    $shortcutPath = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Ric_Facc.lnk'
+    $shortcutPath = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Mimika.lnk'
     $targetPath = Join-Path $script:ProjectRoot 'avvia-ric-facc.cmd'
 
     Write-Step 'Creazione collegamento sul Desktop'
@@ -183,7 +183,7 @@ function Ensure-DesktopShortcut {
     $shortcut.TargetPath = $targetPath
     $shortcut.WorkingDirectory = $script:ProjectRoot
     $shortcut.IconLocation = "$env:SystemRoot\System32\shell32.dll,220"
-    $shortcut.Description = 'Avvia il server locale Ric_Facc'
+    $shortcut.Description = 'Avvia il server locale Mimika - ideato dal dott. Carlo Santoro'
     $shortcut.Save()
 }
 
@@ -195,7 +195,7 @@ function Start-Project {
 
     $launcherPath = Join-Path $script:ProjectRoot 'avvia-ric-facc.cmd'
 
-    Write-Step 'Avvio del server Ric_Facc in una nuova finestra'
+    Write-Step 'Avvio del server Mimika in una nuova finestra'
     Start-Process -FilePath 'cmd.exe' -ArgumentList @('/k', ('"{0}"' -f $launcherPath)) -WorkingDirectory $script:ProjectRoot | Out-Null
 }
 
@@ -210,7 +210,8 @@ if (-not (Test-Administrator)) {
 }
 
 Write-Host ""
-Write-Host 'Ric_Facc - installazione Windows' -ForegroundColor Green
+Write-Host 'Mimika - installazione Windows' -ForegroundColor Green
+Write-Host 'Un programma ideato e gestito dal dott. Carlo Santoro' -ForegroundColor Cyan
 Write-Host "Cartella progetto: $script:ProjectRoot"
 
 Ensure-Node
@@ -219,7 +220,7 @@ Ensure-DesktopShortcut
 Start-Project
 
 Write-Host ""
-Write-Host 'Installazione completata.' -ForegroundColor Green
-Write-Host "Per i prossimi avvii usa: $(Join-Path $script:ProjectRoot 'avvia-ric-facc.cmd')"
+Write-Host 'Installazione completata con successo.' -ForegroundColor Green
+Write-Host "Per i prossimi avvii usa: $(Join-Path $script:ProjectRoot 'avvia-ric-facc.cmd') oppure l'icona Mimika sul Desktop"
 Write-Host "Se il browser non si apre da solo, visita http://localhost:$Port/"
 Write-Host ""

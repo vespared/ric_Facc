@@ -532,6 +532,53 @@
     flex: 1 1 auto;
 }
 
+a.teacher-btn-sm {
+    display: inline-block;
+    text-align: center;
+    text-decoration: none;
+}
+
+.teacher-excel-hint {
+    margin: 10px 0 0;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: var(--muted);
+}
+
+/* Immagine della domanda: specchio della domanda attiva e anteprima del file caricato */
+.teacher-question-image {
+    display: block;
+    margin-top: 14px;
+    max-width: 100%;
+    max-height: 220px;
+    object-fit: contain;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.94);
+    padding: 6px;
+}
+
+.teacher-question-image[hidden] {
+    display: none;
+}
+
+.excel-preview-card-media {
+    margin: 8px 0 0;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.excel-preview-card-media img {
+    width: 96px;
+    height: 72px;
+    object-fit: contain;
+    flex: 0 0 auto;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.94);
+}
+
+
+
 .teacher-btn-xs {
     padding: 5px 10px;
     font-size: 0.78rem;
@@ -1142,6 +1189,8 @@
 .archive-entry-actions {
     display: flex;
     gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
 }
 
 /* --- Modale Cambio Studente --- */
@@ -1179,4 +1228,268 @@
     margin-top: 6px;
     line-height: 1.4;
 }
+
+/* ============================================================
+   TEACHER MIMIKA FOOTER BRANDING & CREDIT
+   ============================================================ */
+.teacher-branding-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 36px;
+    margin-bottom: 24px;
+    padding: 16px 24px;
+    background: rgba(15, 28, 51, 0.7);
+    border: 1px solid rgba(136, 176, 255, 0.2);
+    border-radius: 16px;
+    color: var(--muted);
+    font-size: 0.94rem;
+    text-align: center;
+    letter-spacing: 0.02em;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(12px);
+}
+
+.teacher-branding-footer .brand-name {
+    font-weight: 800;
+    color: var(--cyan);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.teacher-branding-footer .credit-divider {
+    color: rgba(255, 255, 255, 0.25);
+}
+
+.teacher-branding-footer .credit-text {
+    font-weight: 600;
+    color: var(--text);
+}
+
+/* ============================================================
+   BARRA E MODALE SALVATAGGIO QUESTIONARIO STUDENTE
+   ============================================================ */
+.teacher-questionnaire-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    background: rgba(45, 226, 230, 0.08);
+    border: 1px solid rgba(45, 226, 230, 0.25);
+    border-radius: 16px;
+    flex-wrap: wrap;
+}
+
+.teacher-save-q-btn {
+    font-size: 0.94rem;
+    padding: 9px 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 14px rgba(45, 226, 230, 0.25);
+}
+
+.questionnaire-info-pill {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--cyan);
+    background: rgba(13, 26, 51, 0.8);
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(45, 226, 230, 0.3);
+}
+
+.save-questionnaire-modal {
+    width: min(680px, 98%);
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.save-modal-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 8px;
+    margin-bottom: 16px;
+    background: rgba(3, 7, 18, 0.5);
+    padding: 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(136, 176, 255, 0.15);
+}
+
+.save-summary-pill {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.save-summary-pill span {
+    font-size: 0.76rem;
+    color: var(--muted);
+    text-transform: uppercase;
+}
+
+.save-summary-pill strong {
+    font-size: 0.95rem;
+    color: var(--text);
+}
+
+.save-modal-section {
+    margin-bottom: 16px;
+}
+
+.save-section-label {
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+}
+
+.save-field-sublabel {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 4px;
+}
+
+.save-format-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+@media (max-width: 540px) {
+    .save-format-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.format-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 14px;
+    background: rgba(15, 28, 51, 0.8);
+    border: 1px solid rgba(136, 176, 255, 0.2);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: border-color 0.18s ease, background-color 0.18s ease;
+    position: relative;
+}
+
+.format-card input[type="radio"] {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
+
+.format-card.is-active,
+.format-card:has(input:checked) {
+    border-color: var(--cyan);
+    background: rgba(45, 226, 230, 0.12);
+}
+
+.format-title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.format-subtitle {
+    font-size: 0.78rem;
+    color: var(--muted);
+}
+
+.teacher-text-input {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(3, 7, 18, 0.7);
+    border: 1px solid rgba(136, 176, 255, 0.3);
+    color: var(--text);
+    font-size: 0.92rem;
+    outline: none;
+    transition: border-color 0.18s ease;
+    box-sizing: border-box;
+}
+
+.teacher-text-input:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 2px rgba(45, 226, 230, 0.2);
+}
+
+.save-destination-card {
+    background: rgba(15, 28, 51, 0.85);
+    border: 1px solid rgba(136, 176, 255, 0.25);
+    border-radius: 14px;
+    padding: 14px;
+}
+
+.save-dest-head {
+    margin-bottom: 10px;
+}
+
+.save-dest-title {
+    font-size: 0.92rem;
+    color: var(--text);
+    display: block;
+}
+
+.save-dest-desc {
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin: 4px 0 0 0;
+    line-height: 1.35;
+}
+
+.server-preset-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+.preset-folder-btn {
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 8px;
+    background: rgba(136, 176, 255, 0.12);
+    border: 1px solid rgba(136, 176, 255, 0.3);
+    color: var(--text);
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.preset-folder-btn:hover {
+    background: rgba(45, 226, 230, 0.2);
+    border-color: var(--cyan);
+}
+
+.save-modal-feedback {
+    margin-top: 14px;
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    line-height: 1.4;
+    font-weight: 600;
+}
+
+.save-modal-feedback.success {
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid rgba(34, 197, 94, 0.4);
+    color: #4ade80;
+}
+
+.save-modal-feedback.error {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #f87171;
+}
+
 

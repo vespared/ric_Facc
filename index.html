@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ric_Facc | Quiz Accessibile</title>
+    <title>Mimika | Quiz Accessibile</title>
 
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
         crossorigin="anonymous"></script>
@@ -30,6 +30,10 @@
         aria-labelledby="questionFileGateTitle">
         <div class="exam-gate__backdrop" aria-hidden="true"></div>
         <div class="exam-gate__card">
+            <div class="gate-brand-banner">
+                <span class="gate-brand-logo">MIMIKA</span>
+                <span class="gate-brand-tag">Quiz Accessibile</span>
+            </div>
             <p class="exam-gate__eyebrow">Preparazione quiz</p>
             <h2 class="exam-gate__title" id="questionFileGateTitle">Carica il file delle domande</h2>
             <p class="exam-gate__body question-file-gate__body">
@@ -46,6 +50,9 @@
             <p class="question-file-gate__status" id="gateFileStatus" role="status" aria-live="polite">
                 Nessun file caricato.
             </p>
+            <footer class="gate-footer-credit">
+                Un programma ideato e gestito dal dott. Carlo Santoro
+            </footer>
         </div>
     </div>
 
@@ -68,6 +75,10 @@
 
                     <article class="question-card">
                         <p class="question-text" id="questionText"></p>
+                        <figure class="question-media" id="questionMedia" hidden>
+                            <img class="question-media__img" id="questionImage" alt="Immagine della domanda" decoding="async">
+                            <figcaption class="question-media__fallback" id="questionImageFallback" hidden></figcaption>
+                        </figure>
                         <div class="command-strip student-hidden-ui" aria-hidden="true">
                             <span class="command-chip mouth" id="mouthCommandLabel">Bocca: Scroll / Conferma</span>
                             <span class="command-chip eyes" id="eyesCommandLabel">Occhi: Seleziona / Annulla</span>
@@ -102,6 +113,12 @@
                             <p class="answer-feedback__subtitle" id="answerFeedbackSubtitle"></p>
                         </div>
                     </div>
+
+                    <footer class="app-branding-footer student-footer-credit">
+                        <span class="brand-name">MIMIKA</span>
+                        <span class="credit-divider">&bull;</span>
+                        <span class="credit-text">Un programma ideato e gestito dal dott. Carlo Santoro</span>
+                    </footer>
                 </div>
             </section>
         </main>
@@ -129,6 +146,7 @@
                     <li><strong>Excel:</strong> puoi caricare direttamente <code>.xlsx</code> oppure usare <code>.csv</code>.</li>
                     <li><strong>Word:</strong> puoi caricare direttamente <code>.docx</code> oppure usare <code>.txt</code> con blocchi separati.</li>
                     <li><strong>Campi richiesti:</strong> titolo (opzionale), testo domanda, da 2 a 4 risposte, risposta corretta.</li>
+                    <li><strong>Immagini:</strong> colonna <code>Immagine</code> (opzionale): inserisci l'immagine nella riga della domanda oppure scrivi il nome di un file nella cartella <code>immagini/</code>.</li>
                 </ul>
             </div>
 
@@ -293,6 +311,7 @@
     </div>
 
     <script src="webcam-usb.js"></script>
+    <script src="question-images.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

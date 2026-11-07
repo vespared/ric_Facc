@@ -2,7 +2,8 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { exec } = require('child_process');
+const crypto = require('crypto');
+const { exec, execSync } = require('child_process');
 const { URL } = require('url');
 
 const PORT = Number(process.env.PORT || 3000);
@@ -18,6 +19,10 @@ const MIME_TYPES = {
     '.json': 'application/json; charset=utf-8',
     '.md': 'text/markdown; charset=utf-8',
     '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
     '.svg': 'image/svg+xml',
     '.txt': 'text/plain; charset=utf-8',
     '.csv': 'text/csv; charset=utf-8',
@@ -36,6 +41,17 @@ if (!fs.existsSync(STUDENTS_BASE_DIR)) {
         fs.mkdirSync(STUDENTS_BASE_DIR, { recursive: true });
     } catch (e) {
         console.error('[server] Errore creazione cartella studenti:', e.message);
+    }
+}
+
+// Immagini delle domande: caricate dal pannello/quiz o copiate a mano in questa cartella.
+const IMAGES_DIR = path.join(ROOT_DIR, 'immagini');
+const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
+if (!fs.existsSync(IMAGES_DIR)) {
+    try {
+        fs.mkdirSync(IMAGES_DIR, { recursive: true });
+    } catch (e) {
+        console.error('[server] Errore creazione cartella immagini:', e.message);
     }
 }
 
@@ -62,14 +78,152 @@ function sanitizeName(name) {
 }
 
 function getStudentDir(name) {
-    const dir = path.join(STUDENTS_BASE_DIR, sanitizeName(name));
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+    const clean = sanitizeName(name);
+    const directPath = path.join(STUDENTS_BASE_DIR, clean);
+    if (fs.existsSync(directPath)) {
+        return directPath;
     }
-    return dir;
+    if ((clean === 'Martinelli_Giuseppe' || clean.toLowerCase() === 'martinelli_giuseppe') && fs.existsSync(path.join(STUDENTS_BASE_DIR, 'Martinelli'))) {
+        return path.join(STUDENTS_BASE_DIR, 'Martinelli');
+    }
+    if ((clean === 'Martinelli' || clean.toLowerCase() === 'martinelli') && fs.existsSync(path.join(STUDENTS_BASE_DIR, 'Martinelli_Giuseppe'))) {
+        return path.join(STUDENTS_BASE_DIR, 'Martinelli_Giuseppe');
+    }
+    if (fs.existsSync(STUDENTS_BASE_DIR)) {
+        const dirs = fs.readdirSync(STUDENTS_BASE_DIR, { withFileTypes: true }).filter((d) => d.isDirectory());
+        const match = dirs.find((d) => d.name.toLowerCase() === clean.toLowerCase() ||
+                                       d.name.toLowerCase().replace(/_/g, '') === clean.toLowerCase().replace(/_/g, ''));
+        if (match) {
+            return path.join(STUDENTS_BASE_DIR, match.name);
+        }
+    }
+    if (!fs.existsSync(directPath)) {
+        fs.mkdirSync(directPath, { recursive: true });
+    }
+    return directPath;
 }
 
 getStudentDir('Martinelli');
+
+function getDesktopDir() {
+    const home = os.homedir();
+    const candidateDirs = [
+        path.join(home, 'Desktop'),
+        path.join(home, 'OneDrive', 'Desktop'),
+        path.join(home, 'Scrivania')
+    ];
+    for (const d of candidateDirs) {
+        if (fs.existsSync(d)) {
+            return d;
+        }
+    }
+    return path.join(home, 'Desktop');
+}
+
+function findBrowserExecutable() {
+    const candidates = [
+        'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+        'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
+    ];
+    if (process.env.LOCALAPPDATA) {
+        candidates.push(
+            path.join(process.env.LOCALAPPDATA, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+            path.join(process.env.LOCALAPPDATA, 'Google', 'Chrome', 'Application', 'chrome.exe')
+        );
+    }
+    for (const exe of candidates) {
+        if (fs.existsSync(exe)) {
+            return exe;
+        }
+    }
+    return null;
+}
+
+function convertHtmlToPdf(htmlContent, outputPdfPath) {
+    const browserExe = findBrowserExecutable();
+    const destDir = path.dirname(outputPdfPath);
+    if (!fs.existsSync(destDir)) {
+        fs.mkdirSync(destDir, { recursive: true });
+    }
+
+    if (browserExe) {
+        const tempDir = os.tmpdir();
+        const tempHtml = path.join(tempDir, `mimika_report_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.html`);
+        fs.writeFileSync(tempHtml, htmlContent, 'utf-8');
+
+        try {
+            const cmd = `powershell -NoProfile -Command "Start-Process -FilePath '${browserExe}' -ArgumentList '--headless', '--disable-gpu', '--no-pdf-header-footer', '--run-all-compositor-stages-before-draw', '--print-to-pdf=\\"${outputPdfPath}\\"', '\\"${tempHtml}\\"' -Wait"`;
+            execSync(cmd, { timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] });
+
+            if (fs.existsSync(outputPdfPath) && fs.statSync(outputPdfPath).size > 500) {
+                console.log(`[pdf] Generato con successo tramite ${path.basename(browserExe)}: ${outputPdfPath}`);
+                return true;
+            }
+        } catch (err) {
+            console.warn('[pdf] Errore esecuzione browser headless:', err.message);
+        } finally {
+            try {
+                if (fs.existsSync(tempHtml)) fs.unlinkSync(tempHtml);
+            } catch (e) {}
+        }
+    }
+
+    // Fallback: minimal valid PDF generation if browser is unavailable
+    generateFallbackPdf(htmlContent, outputPdfPath);
+    return fs.existsSync(outputPdfPath);
+}
+
+function generateFallbackPdf(htmlContent, outputPdfPath) {
+    const textContent = htmlContent
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const lines = [];
+    for (let i = 0; i < textContent.length; i += 75) {
+        lines.push(textContent.slice(i, i + 75));
+    }
+
+    let textStream = 'BT /F1 12 Tf 50 770 Td 15 TL\n';
+    for (const l of lines.slice(0, 48)) {
+        const safe = l.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+        textStream += `(${safe}) '\n`;
+    }
+    textStream += 'ET';
+
+    const pdfData = `%PDF-1.4
+1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
+3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj
+4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj
+5 0 obj << /Length ${Buffer.byteLength(textStream)} >>
+stream
+${textStream}
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000010 00000 n 
+0000000060 00000 n 
+0000000117 00000 n 
+0000000227 00000 n 
+0000000305 00000 n 
+trailer << /Size 6 /Root 1 0 R >>
+startxref
+${390 + Buffer.byteLength(textStream)}
+%%EOF`;
+
+    fs.writeFileSync(outputPdfPath, pdfData, 'binary');
+}
 
 function formatDateItalian(d) {
     const date = (d instanceof Date && !isNaN(d.getTime())) ? d : new Date();
@@ -106,8 +260,8 @@ function escapeHtml(str) {
 }
 
 function generatePrintableHtml(quizData, options = {}) {
-    const student = escapeHtml(quizData.studente || 'Studente');
-    const subject = escapeHtml(quizData.materia || 'Quiz');
+    const student = escapeHtml(quizData.studente || 'Martinelli Giuseppe');
+    const subject = escapeHtml(quizData.materia || 'Italiano');
     const isTotal = quizData.tipoRisultato === 'totale' || quizData.stato === 'completato';
     const badgeClass = isTotal ? 'badge-totale' : 'badge-parziale';
     const badgeText = isTotal ? 'Test Concluso (Totale)' : 'Test in Corso (Parziale)';
@@ -118,23 +272,56 @@ function generatePrintableHtml(quizData, options = {}) {
     const score = quizData.punteggio || { esatte: 0, errate: 0, libere: 0, totaleRisposte: 0, percentuale: 0 };
     const pct = typeof score.percentuale === 'number' ? score.percentuale : Math.round(((score.esatte || 0) / (totalQuestions || 1)) * 100);
 
+    let logoDataUrl = '';
+    const logoFile = path.join(ROOT_DIR, 'logo_gruppo_whatsapp.png');
+    if (fs.existsSync(logoFile)) {
+        try {
+            const b64 = fs.readFileSync(logoFile).toString('base64');
+            logoDataUrl = `data:image/png;base64,${b64}`;
+        } catch (e) {}
+    }
+
     const questionsHtml = (quizData.domande || []).map((q, idx) => {
-        const studentAns = (quizData.answers || []).find((a) => a && (a.questionIndex === idx || a.title === q.title))
-            || (quizData.answers && quizData.answers[idx]);
+        const studentAns = (quizData.answers || []).find((a) => a && (
+            a.questionIndex === idx ||
+            (a.title && a.title === q.title) ||
+            (a.questionTitle && a.questionTitle === q.title)
+        )) || (quizData.answers && quizData.answers[idx]);
 
         const title = escapeHtml(q.title || `Domanda ${idx + 1}`);
         const prompt = escapeHtml(q.prompt || '');
         const optionsList = Array.isArray(q.options) ? q.options : [];
         const correctIndex = typeof q.correctIndex === 'number' ? q.correctIndex : null;
 
+        let imageHtml = '';
+        if (typeof q.image === 'string' && q.image) {
+            let imageSrc = q.image;
+            if (!/^(data:|https?:)/i.test(q.image)) {
+                const localImgPath = path.isAbsolute(q.image) ? q.image : path.join(ROOT_DIR, q.image);
+                if (fs.existsSync(localImgPath)) {
+                    try {
+                        const ext = path.extname(localImgPath).toLowerCase().replace('.', '');
+                        const mime = ext === 'jpg' ? 'jpeg' : (ext === 'svg' ? 'svg+xml' : ext);
+                        const b64 = fs.readFileSync(localImgPath).toString('base64');
+                        imageSrc = `data:image/${mime};base64,${b64}`;
+                    } catch (e) {
+                        imageSrc = `${options.imageBase || ''}${q.image}`;
+                    }
+                } else {
+                    imageSrc = `${options.imageBase || ''}${q.image}`;
+                }
+            }
+            imageHtml = `<figure class="question-image"><img src="${escapeHtml(imageSrc)}" alt="Immagine della domanda"></figure>`;
+        }
+
         let evalPill = '';
         if (studentAns) {
             if (studentAns.outcome === 'correct' || studentAns.isCorrect === true) {
-                evalPill = '<span class="answer-evaluation-pill pill-correct">&#10003; RISPOSTA DELLO STUDENTE: CORRETTA</span>';
+                evalPill = `<span class="answer-evaluation-pill pill-correct">&#10003; RISPOSTA SCELTA DALLO STUDENTE: CORRETTA (${escapeHtml(studentAns.chosenText || '')})</span>`;
             } else if (studentAns.outcome === 'wrong' || studentAns.isCorrect === false) {
-                evalPill = '<span class="answer-evaluation-pill pill-wrong">&#10007; RISPOSTA DELLO STUDENTE: ERRATA</span>';
+                evalPill = `<span class="answer-evaluation-pill pill-wrong">&#10007; RISPOSTA SCELTA DALLO STUDENTE: ERRATA (${escapeHtml(studentAns.chosenText || '')})</span>`;
             } else {
-                evalPill = '<span class="answer-evaluation-pill pill-free">&#10022; SCELTA REGISTRATA</span>';
+                evalPill = `<span class="answer-evaluation-pill pill-free">&#10022; SCELTA REGISTRATA: ${escapeHtml(studentAns.chosenText || '')}</span>`;
             }
         } else {
             evalPill = '<span class="answer-evaluation-pill pill-unanswered">&#9675; NON ANCORA RISPOSTA (Sospeso)</span>';
@@ -142,7 +329,14 @@ function generatePrintableHtml(quizData, options = {}) {
 
         const optionsHtml = optionsList.map((opt, optIdx) => {
             const letter = ['A', 'B', 'C', 'D'][optIdx] || String(optIdx + 1);
-            const isStudentChoice = studentAns && (studentAns.selectedIndex === optIdx);
+            const isStudentChoice = Boolean(studentAns && (
+                studentAns.selectedIndex === optIdx ||
+                studentAns.chosenIndex === optIdx ||
+                studentAns.choiceIndex === optIdx ||
+                (studentAns.chosenText && String(studentAns.chosenText).trim().toLowerCase() === String(opt).trim().toLowerCase()) ||
+                (studentAns.selectedText && String(studentAns.selectedText).trim().toLowerCase() === String(opt).trim().toLowerCase())
+            ));
+
             let choiceClass = '';
             if (isStudentChoice) {
                 choiceClass = 'is-student-choice';
@@ -157,7 +351,7 @@ function generatePrintableHtml(quizData, options = {}) {
             return `<div class="option-item ${choiceClass}">
                 <span class="option-letter">${letter}</span>
                 <span class="option-text">${escapeHtml(opt)}</span>
-                ${isStudentChoice ? '<span style="margin-left:auto; font-weight:800; font-size:0.85rem;">[SCELTA DELLO STUDENTE]</span>' : ''}
+                ${isStudentChoice ? '<span class="student-badge-tag">&#9758; SCELTA DELLO STUDENTE</span>' : ''}
             </div>`;
         }).join('');
 
@@ -174,6 +368,7 @@ function generatePrintableHtml(quizData, options = {}) {
                 <strong>${title}</strong>
             </div>
             <p class="question-prompt">${prompt}</p>
+            ${imageHtml}
             <div class="options-list">
                 ${optionsHtml}
             </div>
@@ -189,6 +384,15 @@ function generatePrintableHtml(quizData, options = {}) {
         });
     </script>` : '';
 
+    const toolbarHtml = options.isPdf ? '' : `
+    <div class="print-toolbar">
+        <span class="print-toolbar-title">Scheda Risultati Quiz Didattico (PDF)</span>
+        <div class="print-toolbar-actions">
+            <button class="btn-print" onclick="window.print()">&#128438; Stampa / Salva in PDF</button>
+            <button class="btn-close" onclick="window.close()">Chiudi</button>
+        </div>
+    </div>`;
+
     return `<!DOCTYPE html>
 <html lang="it">
 <head>
@@ -196,13 +400,19 @@ function generatePrintableHtml(quizData, options = {}) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Scheda Risultati Quiz - ${student} - ${subject}</title>
     <style>
+        @page {
+            size: A4 portrait;
+            margin: 12mm 14mm 14mm 14mm;
+        }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-            background: #f1f5f9;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f8fafc;
             color: #0f172a;
             line-height: 1.5;
-            padding: 24px 16px;
+            padding: ${options.isPdf ? '0' : '24px 16px'};
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
         }
         .print-toolbar {
             max-width: 860px;
@@ -254,24 +464,37 @@ function generatePrintableHtml(quizData, options = {}) {
             max-width: 860px;
             margin: 0 auto;
             background: #ffffff;
-            border: 1px solid #cbd5e1;
+            border: ${options.isPdf ? 'none' : '1px solid #cbd5e1'};
             border-radius: 12px;
-            padding: 40px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+            padding: ${options.isPdf ? '20px 0' : '40px'};
+            box-shadow: ${options.isPdf ? 'none' : '0 10px 25px -5px rgba(0, 0, 0, 0.05)'};
         }
         .report-header {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
+            align-items: center;
             border-bottom: 2px solid #0f172a;
             padding-bottom: 18px;
             margin-bottom: 24px;
         }
+        .report-brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .report-logo-img {
+            width: 52px;
+            height: 52px;
+            object-fit: contain;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+        }
         .report-logo-text {
-            font-size: 1.5rem;
+            font-size: 1.55rem;
             font-weight: 800;
             letter-spacing: -0.02em;
             color: #0f172a;
+            line-height: 1.1;
         }
         .report-subtitle {
             font-size: 0.85rem;
@@ -279,6 +502,7 @@ function generatePrintableHtml(quizData, options = {}) {
             text-transform: uppercase;
             letter-spacing: 0.05em;
             font-weight: 600;
+            margin-top: 4px;
         }
         .report-badge {
             display: inline-block;
@@ -303,29 +527,33 @@ function generatePrintableHtml(quizData, options = {}) {
         .meta-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 14px 24px;
+            gap: 12px 24px;
             background: #f8fafc;
             border: 1px solid #e2e8f0;
             border-radius: 10px;
             padding: 16px 20px;
             margin-bottom: 24px;
+            break-inside: avoid;
+            page-break-inside: avoid;
         }
         .meta-item { display: flex; flex-direction: column; gap: 2px; }
         .meta-label { font-size: 0.78rem; text-transform: uppercase; font-weight: 700; color: #64748b; }
-        .meta-value { font-size: 1.05rem; font-weight: 700; color: #0f172a; }
+        .meta-value { font-size: 1.1rem; font-weight: 700; color: #0f172a; }
 
         .score-banner {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 16px 22px;
+            padding: 18px 24px;
             background: #f0fdf4;
             border: 1px solid #bbf7d0;
             border-radius: 10px;
-            margin-bottom: 30px;
+            margin-bottom: 28px;
+            break-inside: avoid;
+            page-break-inside: avoid;
         }
         .score-pct {
-            font-size: 2.2rem;
+            font-size: 2.3rem;
             font-weight: 800;
             color: #15803d;
             line-height: 1;
@@ -334,11 +562,12 @@ function generatePrintableHtml(quizData, options = {}) {
             text-align: right;
             font-size: 0.95rem;
             color: #1e293b;
+            line-height: 1.45;
         }
         .score-summary strong { color: #0f172a; font-size: 1.05rem; }
 
         .questions-section-title {
-            font-size: 1.15rem;
+            font-size: 1.18rem;
             font-weight: 800;
             color: #0f172a;
             margin-bottom: 16px;
@@ -346,7 +575,7 @@ function generatePrintableHtml(quizData, options = {}) {
             padding-bottom: 8px;
         }
         .question-entry {
-            border: 1px solid #e2e8f0;
+            border: 1px solid #cbd5e1;
             border-radius: 10px;
             padding: 18px 20px;
             margin-bottom: 18px;
@@ -371,6 +600,20 @@ function generatePrintableHtml(quizData, options = {}) {
             color: #0f172a;
             margin-bottom: 14px;
         }
+        .question-image {
+            margin: 0 0 14px 0;
+            text-align: center;
+        }
+        .question-image img {
+            display: inline-block;
+            max-width: 100%;
+            max-height: 220px;
+            object-fit: contain;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: #ffffff;
+            padding: 4px;
+        }
         .options-list {
             display: grid;
             gap: 8px;
@@ -378,9 +621,9 @@ function generatePrintableHtml(quizData, options = {}) {
         }
         .option-item {
             display: flex;
-            align-items: flex-start;
+            align-items: center;
             gap: 10px;
-            padding: 10px 14px;
+            padding: 9px 14px;
             border-radius: 8px;
             background: #f8fafc;
             border: 1px solid #e2e8f0;
@@ -388,21 +631,22 @@ function generatePrintableHtml(quizData, options = {}) {
         }
         .option-item.is-student-choice {
             font-weight: 700;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
         .option-item.choice-correct {
             background: #dcfce7 !important;
             border-color: #22c55e !important;
-            color: #14532d;
+            color: #14532d !important;
         }
         .option-item.choice-wrong {
             background: #fee2e2 !important;
             border-color: #ef4444 !important;
-            color: #7f1d1d;
+            color: #7f1d1d !important;
         }
         .option-item.choice-free {
             background: #e0f2fe !important;
             border-color: #38bdf8 !important;
-            color: #0369a1;
+            color: #0369a1 !important;
         }
         .option-letter {
             display: inline-flex;
@@ -415,26 +659,43 @@ function generatePrintableHtml(quizData, options = {}) {
             font-weight: 800;
             font-size: 0.8rem;
             flex-shrink: 0;
-            margin-top: 1px;
         }
         .is-student-choice .option-letter {
             background: #0f172a;
             color: #ffffff;
         }
+        .choice-correct .option-letter {
+            background: #16a34a !important;
+            color: #ffffff !important;
+        }
+        .choice-wrong .option-letter {
+            background: #dc2626 !important;
+            color: #ffffff !important;
+        }
+        .student-badge-tag {
+            margin-left: auto;
+            font-weight: 800;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            padding: 3px 8px;
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.08);
+        }
         .answer-evaluation-pill {
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            font-size: 0.82rem;
+            font-size: 0.84rem;
             font-weight: 700;
-            padding: 4px 10px;
+            padding: 5px 12px;
             border-radius: 6px;
             margin-top: 6px;
         }
-        .pill-correct { background: #dcfce7; color: #166534; }
-        .pill-wrong { background: #fee2e2; color: #991b1b; }
-        .pill-free { background: #e0f2fe; color: #075985; }
-        .pill-unanswered { background: #f1f5f9; color: #64748b; }
+        .pill-correct { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+        .pill-wrong { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+        .pill-free { background: #e0f2fe; color: #075985; border: 1px solid #7dd3fc; }
+        .pill-unanswered { background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; }
 
         .correct-answer-note {
             margin-top: 8px;
@@ -447,19 +708,19 @@ function generatePrintableHtml(quizData, options = {}) {
         }
 
         .report-footer {
-            margin-top: 36px;
-            padding-top: 20px;
+            margin-top: 32px;
+            padding-top: 18px;
             border-top: 1px solid #cbd5e1;
             display: grid;
             grid-template-columns: 1.5fr 1fr;
-            gap: 20px;
+            gap: 24px;
             break-inside: avoid;
             page-break-inside: avoid;
         }
         .notes-area {
             border: 1px dashed #cbd5e1;
             border-radius: 8px;
-            min-height: 80px;
+            min-height: 75px;
             padding: 10px 14px;
             color: #64748b;
             font-size: 0.88rem;
@@ -478,7 +739,7 @@ function generatePrintableHtml(quizData, options = {}) {
         }
 
         @media print {
-            body { background: #ffffff; padding: 0; color: #000; }
+            body { background: #ffffff !important; padding: 0 !important; color: #000; }
             .print-toolbar { display: none !important; }
             .report-sheet {
                 border: none !important;
@@ -488,28 +749,23 @@ function generatePrintableHtml(quizData, options = {}) {
             }
             .question-entry {
                 border: 1px solid #94a3b8 !important;
-            }
-            * {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
             }
         }
     </style>
 </head>
 <body>
-    <div class="print-toolbar">
-        <span class="print-toolbar-title">Scheda Risultati Quiz Didattico (PDF)</span>
-        <div class="print-toolbar-actions">
-            <button class="btn-print" onclick="window.print()">&#128438; Stampa / Salva in PDF</button>
-            <button class="btn-close" onclick="window.close()">Chiudi</button>
-        </div>
-    </div>
+    ${toolbarHtml}
 
     <main class="report-sheet">
         <header class="report-header">
-            <div>
-                <h1 class="report-logo-text">RIC_FACC</h1>
-                <p class="report-subtitle">Valutazione Didattica e Autonomia Digitale</p>
+            <div class="report-brand">
+                ${logoDataUrl ? `<img src="${logoDataUrl}" alt="Logo" class="report-logo-img">` : ''}
+                <div>
+                    <h1 class="report-logo-text">MIMIKA</h1>
+                    <p class="report-subtitle">Valutazione Didattica e Autonomia Digitale</p>
+                </div>
             </div>
             <span class="report-badge ${badgeClass}">${badgeText}</span>
         </header>
@@ -524,7 +780,7 @@ function generatePrintableHtml(quizData, options = {}) {
                 <span class="meta-value">${subject}</span>
             </div>
             <div class="meta-item">
-                <span class="meta-label">Data Inizio</span>
+                <span class="meta-label">Data Svolgimento Prova</span>
                 <span class="meta-value">${dateFormatted}</span>
             </div>
             <div class="meta-item">
@@ -546,14 +802,14 @@ function generatePrintableHtml(quizData, options = {}) {
         </section>
 
         <section class="questions-section">
-            <h2 class="questions-section-title">Dettaglio Domande e Risposte</h2>
+            <h2 class="questions-section-title">Dettaglio Domande e Risposte della Prova</h2>
             ${questionsHtml}
         </section>
 
         <footer class="report-footer">
             <div>
                 <span class="meta-label" style="display:block; margin-bottom:6px;">Osservazioni del Docente:</span>
-                <div class="notes-area">Note o commenti sullo svolgimento della prova...</div>
+                <div class="notes-area">Note o commenti sullo svolgimento della prova da parte dello studente...</div>
             </div>
             <div>
                 <div class="signature-box">
@@ -561,6 +817,10 @@ function generatePrintableHtml(quizData, options = {}) {
                 </div>
             </div>
         </footer>
+
+        <div class="report-creator-credit" style="margin-top: 24px; padding-top: 14px; border-top: 1px solid #cbd5e1; text-align: center; font-size: 0.88rem; color: #475569; font-weight: 600; break-inside: avoid; page-break-inside: avoid;">
+            <strong style="color: #0f172a; letter-spacing: 0.05em;">MIMIKA</strong> &mdash; Un programma ideato e gestito dal dott. Carlo Santoro
+        </div>
     </main>
 
     ${autoPrintScript}
@@ -651,12 +911,22 @@ function saveTotalQuiz(payload) {
 
     // Write printable HTML file directly into student directory
     try {
-        const htmlReport = generatePrintableHtml(data);
+        const htmlReport = generatePrintableHtml(data, { imageBase: '../../' });
         const reportPath = path.join(studentDir, data.schedaReport);
         fs.writeFileSync(reportPath, htmlReport, 'utf-8');
         console.log(`[quiz] salvata scheda stampabile in ${data.schedaReport}`);
     } catch (e) {
         console.error('[quiz] errore generazione scheda HTML:', e.message);
+    }
+
+    // Esporta automaticamente la scheda in formato PDF sul Desktop del server
+    try {
+        const pdfExport = exportQuizPdf({ student, file: totalFileName, saveToDesktop: true });
+        data.schedaPdf = pdfExport.fileName;
+        data.schedaPdfDesktop = pdfExport.desktopPath;
+        console.log(`[quiz] salvata scheda PDF sul Desktop del server: ${pdfExport.desktopPath}`);
+    } catch (e) {
+        console.error('[quiz] errore esportazione PDF automatica:', e.message);
     }
 
     // Clean up or complete old partial file
@@ -673,6 +943,63 @@ function saveTotalQuiz(payload) {
     }
 
     return data;
+}
+
+function exportQuizPdf({ student, file, saveToDesktop = true }) {
+    const studentName = sanitizeName(student || state.activeStudent);
+    const studentDir = getStudentDir(studentName);
+
+    let targetFile = file;
+    if (!targetFile) {
+        const files = fs.readdirSync(studentDir).filter((f) => f.endsWith('.json'));
+        if (files.length === 0) {
+            throw new Error(`Nessun test trovato per lo studente ${studentName}.`);
+        }
+        files.sort().reverse();
+        targetFile = files[0];
+    }
+
+    const filePath = path.join(studentDir, path.basename(targetFile));
+    if (!fs.existsSync(filePath)) {
+        throw new Error(`File di risultato non trovato: ${targetFile}`);
+    }
+
+    const raw = fs.readFileSync(filePath, 'utf-8');
+    const quizData = JSON.parse(raw);
+
+    const htmlContent = generatePrintableHtml(quizData, { isPdf: true });
+    const dateObj = new Date(quizData.dataIso || quizData.data || Date.now());
+    const dateStr = formatDateFile(dateObj);
+    const safeStudent = sanitizeName(quizData.studente || studentName);
+    const safeSubject = sanitizeName(quizData.materia || 'Quiz');
+    const pdfFileName = `Prova_${safeSubject}_${safeStudent}_${dateStr}.pdf`;
+
+    const studentPdfPath = path.join(studentDir, pdfFileName);
+    convertHtmlToPdf(htmlContent, studentPdfPath);
+
+    let desktopPath = null;
+    if (saveToDesktop) {
+        const desktopDir = getDesktopDir();
+        desktopPath = path.join(desktopDir, pdfFileName);
+        try {
+            fs.copyFileSync(studentPdfPath, desktopPath);
+            console.log(`[pdf] Esportato con successo sul Desktop del server: ${desktopPath}`);
+        } catch (e) {
+            console.error('[pdf] Errore salvataggio sul Desktop:', e.message);
+        }
+    }
+
+    const pdfBuffer = fs.readFileSync(studentPdfPath);
+
+    return {
+        ok: true,
+        fileName: pdfFileName,
+        studentPdfPath,
+        desktopPath,
+        size: pdfBuffer.length,
+        buffer: pdfBuffer,
+        quizData
+    };
 }
 
 function getActiveSuspendedSession(studentName) {
@@ -843,6 +1170,69 @@ function readRequestBody(request) {
     });
 }
 
+// Corpo binario (immagini): oltre il limite il contenuto viene scartato e la richiesta fallisce a fine lettura,
+// cosi il client riceve un errore leggibile invece di una connessione interrotta.
+function readRequestBuffer(request, maxBytes) {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        let size = 0;
+
+        request.on('data', (chunk) => {
+            size += chunk.length;
+            if (size <= maxBytes) {
+                chunks.push(chunk);
+            }
+        });
+
+        request.on('end', () => {
+            if (size > maxBytes) {
+                reject(new Error(`Immagine troppo grande: massimo ${Math.round(maxBytes / (1024 * 1024))} MB.`));
+                return;
+            }
+            resolve(Buffer.concat(chunks));
+        });
+
+        request.on('error', reject);
+    });
+}
+
+// Riconosce il formato dai primi byte: il tipo dichiarato dal client non e attendibile.
+function detectImageExtension(buffer) {
+    if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
+        return 'png';
+    }
+    if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+        return 'jpg';
+    }
+    if (buffer.length >= 6 && /^GIF8[79]a$/.test(buffer.subarray(0, 6).toString('latin1'))) {
+        return 'gif';
+    }
+    if (buffer.length >= 12
+        && buffer.subarray(0, 4).toString('latin1') === 'RIFF'
+        && buffer.subarray(8, 12).toString('latin1') === 'WEBP') {
+        return 'webp';
+    }
+    return null;
+}
+
+function saveQuestionImage(buffer) {
+    const extension = detectImageExtension(buffer);
+    if (!extension) {
+        throw new Error('Formato immagine non supportato. Usa PNG, JPG, GIF o WEBP.');
+    }
+
+    // Nome = impronta del contenuto: la stessa immagine caricata piu volte occupa un solo file.
+    const hash = crypto.createHash('sha256').update(buffer).digest('hex').slice(0, 20);
+    const fileName = `${hash}.${extension}`;
+    const filePath = path.join(IMAGES_DIR, fileName);
+    if (!fs.existsSync(filePath)) {
+        fs.writeFileSync(filePath, buffer);
+        console.log(`[immagini] salvata ${fileName} (${buffer.length} byte)`);
+    }
+
+    return { url: `immagini/${fileName}`, bytes: buffer.length };
+}
+
 function safeResolveFile(urlPath) {
     const relativePath = urlPath === '/' ? '/index.html' : urlPath;
     const normalized = path.normalize(relativePath)
@@ -926,6 +1316,17 @@ function handleApiRequest(request, response, url) {
             })
             .catch((error) => {
                 sendJson(response, 400, { error: error.message || 'Payload studente non valido.' });
+            });
+        return true;
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/question-image') {
+        readRequestBuffer(request, MAX_IMAGE_UPLOAD_BYTES)
+            .then((buffer) => {
+                sendJson(response, 200, { ok: true, ...saveQuestionImage(buffer) });
+            })
+            .catch((error) => {
+                sendJson(response, 400, { error: error.message || 'Immagine non valida.' });
             });
         return true;
     }
@@ -1060,6 +1461,123 @@ function handleApiRequest(request, response, url) {
             activeStudent: state.activeStudent,
             activeStudentDir: path.relative(ROOT_DIR, getStudentDir(state.activeStudent)).replace(/\\/g, '/'),
             activeSubject: state.activeSubject
+        });
+        return true;
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/system/folders') {
+        const home = os.homedir();
+        const student = sanitizeName(state.activeStudent || 'Martinelli');
+        const studentDir = getStudentDir(student);
+        const questionnairesDir = path.join(studentDir, 'questionari');
+        if (!fs.existsSync(questionnairesDir)) {
+            try { fs.mkdirSync(questionnairesDir, { recursive: true }); } catch (e) {}
+        }
+        const archiveDir = path.join(ROOT_DIR, 'domande', 'questionari_salvati');
+        if (!fs.existsSync(archiveDir)) {
+            try { fs.mkdirSync(archiveDir, { recursive: true }); } catch (e) {}
+        }
+
+        sendJson(response, 200, {
+            ok: true,
+            desktop: getDesktopDir(),
+            documents: path.join(home, 'Documents'),
+            studentFolder: questionnairesDir,
+            archiveFolder: archiveDir,
+            rootFolder: ROOT_DIR
+        });
+        return true;
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/quiz/current-questionnaire') {
+        const student = url.searchParams.get('student') || state.activeStudent;
+        let questionnaire = null;
+
+        if (state.studentSnapshot && state.studentSnapshot.questionnaire && Array.isArray(state.studentSnapshot.questionnaire.questions) && state.studentSnapshot.questionnaire.questions.length > 0) {
+            questionnaire = state.studentSnapshot.questionnaire;
+        } else {
+            const session = getActiveSuspendedSession(student);
+            if (session && Array.isArray(session.domande) && session.domande.length > 0) {
+                questionnaire = {
+                    student: session.studente || student,
+                    subject: session.materia || state.activeSubject,
+                    totaleDomande: session.totaleDomande || session.domande.length,
+                    currentIndex: session.currentQuestionIndex || 0,
+                    status: session.stato || 'in_corso',
+                    questions: session.domande.map((q, idx) => ({
+                        id: q.id || (idx + 1),
+                        title: q.title || `Domanda ${idx + 1}`,
+                        prompt: q.prompt || '',
+                        options: Array.isArray(q.options) ? [...q.options] : [],
+                        correctIndex: typeof q.correctIndex === 'number' ? q.correctIndex : 0,
+                        correctLetter: ['A', 'B', 'C', 'D'][q.correctIndex] || 'A',
+                        image: q.image || ''
+                    })),
+                    answers: session.answers || []
+                };
+            }
+        }
+
+        sendJson(response, 200, {
+            ok: true,
+            hasQuestionnaire: !!questionnaire,
+            questionnaire: questionnaire || {
+                student: state.activeStudent,
+                subject: state.activeSubject,
+                totaleDomande: 0,
+                currentIndex: 0,
+                status: 'in_attesa',
+                questions: [],
+                answers: []
+            }
+        });
+        return true;
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/quiz/save-questionnaire-to-folder') {
+        readRequestBody(request).then((body) => {
+            const payload = body ? JSON.parse(body) : {};
+            let folderPath = payload.folderPath;
+            if (!folderPath || typeof folderPath !== 'string') {
+                folderPath = getDesktopDir();
+            }
+            if (!path.isAbsolute(folderPath)) {
+                folderPath = path.resolve(ROOT_DIR, folderPath);
+            }
+
+            if (!fs.existsSync(folderPath)) {
+                fs.mkdirSync(folderPath, { recursive: true });
+            }
+
+            const files = Array.isArray(payload.files) ? payload.files : [];
+            if (files.length === 0) {
+                throw new Error('Nessun file fornito per il salvataggio.');
+            }
+
+            const savedPaths = [];
+            for (const file of files) {
+                if (!file || !file.name) continue;
+                const safeName = path.basename(file.name);
+                const targetPath = path.join(folderPath, safeName);
+                if (file.base64) {
+                    const buffer = Buffer.from(file.base64, 'base64');
+                    fs.writeFileSync(targetPath, buffer);
+                } else if (typeof file.content === 'string') {
+                    fs.writeFileSync(targetPath, file.content, 'utf-8');
+                }
+                savedPaths.push(targetPath);
+                console.log(`[quiz] salvato questionario in: ${targetPath}`);
+            }
+
+            sendJson(response, 200, {
+                ok: true,
+                folderPath,
+                savedPaths,
+                fileCount: savedPaths.length
+            });
+        }).catch((err) => {
+            console.error('[quiz] errore salvataggio questionario in cartella:', err.message);
+            sendJson(response, 500, { error: err.message });
         });
         return true;
     }
@@ -1211,6 +1729,95 @@ function handleApiRequest(request, response, url) {
         return true;
     }
 
+    if (request.method === 'GET' && url.pathname === '/api/quiz/export-pdf') {
+        const student = url.searchParams.get('student') || state.activeStudent;
+        const file = url.searchParams.get('file');
+        const isDownload = url.searchParams.get('download') === '1';
+        const saveDesktop = url.searchParams.get('desktop') !== '0';
+
+        try {
+            const result = exportQuizPdf({ student, file, saveToDesktop: saveDesktop });
+            const disposition = isDownload ? 'attachment' : 'inline';
+            response.writeHead(200, {
+                'Content-Type': 'application/pdf',
+                'Content-Disposition': `${disposition}; filename="${result.fileName}"`,
+                'Content-Length': result.buffer.length,
+                'Cache-Control': 'no-store'
+            });
+            response.end(result.buffer);
+        } catch (err) {
+            console.error('[pdf] Errore export-pdf:', err.message);
+            sendText(response, 500, `Errore generazione PDF: ${err.message}`);
+        }
+        return true;
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/quiz/export-pdf-desktop') {
+        readRequestBody(request).then((body) => {
+            const payload = body ? JSON.parse(body) : {};
+            const student = payload.student || state.activeStudent;
+            const file = payload.file;
+            const openInStudentBrowser = Boolean(payload.openInStudentBrowser);
+
+            const result = exportQuizPdf({ student, file, saveToDesktop: true });
+
+            let studentNotified = false;
+            if (openInStudentBrowser) {
+                const command = {
+                    id: state.nextCommandId++,
+                    type: 'open-pdf',
+                    payload: {
+                        url: `/api/quiz/export-pdf?student=${encodeURIComponent(student)}&file=${encodeURIComponent(file || result.fileName)}`,
+                        fileName: result.fileName,
+                        student
+                    },
+                    createdAt: new Date().toISOString()
+                };
+                state.commands.push(command);
+                pruneCommands();
+                studentNotified = true;
+            }
+
+            sendJson(response, 200, {
+                ok: true,
+                desktopPath: result.desktopPath,
+                fileName: result.fileName,
+                studentPdfPath: result.studentPdfPath,
+                studentNotified
+            });
+        }).catch((err) => {
+            console.error('[pdf] Errore export-pdf-desktop:', err.message);
+            sendJson(response, 500, { error: err.message });
+        });
+        return true;
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/quiz/open-student-pdf') {
+        readRequestBody(request).then((body) => {
+            const payload = body ? JSON.parse(body) : {};
+            const student = payload.student || state.activeStudent;
+            const file = payload.file || '';
+
+            const command = {
+                id: state.nextCommandId++,
+                type: 'open-pdf',
+                payload: {
+                    url: `/api/quiz/export-pdf?student=${encodeURIComponent(student)}&file=${encodeURIComponent(file)}`,
+                    fileName: file,
+                    student
+                },
+                createdAt: new Date().toISOString()
+            };
+            state.commands.push(command);
+            pruneCommands();
+            console.log(`[pdf] Inviato comando open-pdf allo studente per file=${file}`);
+            sendJson(response, 200, { ok: true, commandId: command.id });
+        }).catch((err) => {
+            sendJson(response, 400, { error: err.message });
+        });
+        return true;
+    }
+
     return false;
 }
 
@@ -1294,7 +1901,7 @@ function printAvailableUrls() {
     const netInfo = getNetworkDetails();
 
     console.log('');
-    console.log(`Server Ric_Facc attivo sulla porta ${PORT}.`);
+    console.log(`Server Mimika attivo sulla porta ${PORT}.`);
     console.log('Quiz studente su questo PC:');
     console.log(`- ${netInfo.studentUrl}`);
     console.log(`- http://localhost:${PORT}/`);
@@ -1424,6 +2031,17 @@ server.on('error', (error) => {
     process.exit(1);
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-    printAvailableUrls();
-});
+if (require.main === module) {
+    server.listen(PORT, '0.0.0.0', () => {
+        printAvailableUrls();
+    });
+}
+
+module.exports = {
+    server,
+    generatePrintableHtml,
+    exportQuizPdf,
+    saveTotalQuiz,
+    savePartialQuiz
+};
+

@@ -60,6 +60,8 @@ const teacherOptionBInput = document.getElementById('teacherOptionBInput');
 const teacherOptionCInput = document.getElementById('teacherOptionCInput');
 const teacherOptionDInput = document.getElementById('teacherOptionDInput');
 const teacherCorrectAnswerInput = document.getElementById('teacherCorrectAnswerInput');
+const teacherQuestionImageInput = document.getElementById('teacherQuestionImageInput');
+const teacherQuestionImage = document.getElementById('teacherQuestionImage');
 
 let snapshotTimer = null;
 let lastSentCommandId = 0;
@@ -84,6 +86,10 @@ const teacherNewSessionBtn = document.getElementById('teacherNewSessionBtn');
 const teacherCompletedAlertCard = document.getElementById('teacherCompletedAlertCard');
 const completedTestTitle = document.getElementById('completedTestTitle');
 const completedTestMessage = document.getElementById('completedTestMessage');
+const teacherSaveDesktopCompletedBtn = document.getElementById('teacherSaveDesktopCompletedBtn');
+const teacherOpenStudentCompletedBtn = document.getElementById('teacherOpenStudentCompletedBtn');
+const teacherDownloadCompletedLink = document.getElementById('teacherDownloadCompletedLink');
+const teacherExportResultStatus = document.getElementById('teacherExportResultStatus');
 const teacherPrintCompletedBtn = document.getElementById('teacherPrintCompletedBtn');
 const teacherDismissCompletedBtn = document.getElementById('teacherDismissCompletedBtn');
 
@@ -266,6 +272,8 @@ function normalizeQuestion(rawQuestion, index) {
         throw new Error(`Domanda ${index + 1}: servono da 2 a 4 risposte compilate (trovate ${options.length}).`);
     }
 
+    const image = RicFaccImages.readQuestionImage(rawQuestion);
+
     return {
         title,
         prompt,
@@ -274,7 +282,8 @@ function normalizeQuestion(rawQuestion, index) {
             rawQuestion.correctIndex ?? rawQuestion.correct ?? rawQuestion.corretta ?? rawQuestion.rispostaesatta ?? rawQuestion.rispostacorretta ?? rawQuestion.esatta ?? rawQuestion.answer ?? rawQuestion.risposta ?? rawQuestion.soluzione,
             options,
             index
-        )
+        ),
+        ...(image ? { image } : {})
     };
 }
 
@@ -300,7 +309,8 @@ function mapRowToQuestion(row, rowIndex) {
         title,
         prompt,
         options: rawOptions,
-        correct
+        correct,
+        image: RicFaccImages.readQuestionImage(normalizedRow)
     }, rowIndex);
 }
 
@@ -324,6 +334,7 @@ function parseCsvQuestions(text) {
     const optionCIndex = findColumn(['optionc', 'opzionec', 'rispostac', 'c', 'opzione3', 'risposta3']);
     const optionDIndex = findColumn(['optiond', 'opzioned', 'rispostad', 'd', 'opzione4', 'risposta4']);
     const correctIndex = findColumn(['correct', 'corretta', 'rispostaesatta', 'rispostacorretta', 'esatta', 'answer', 'risposta', 'soluzione', 'chiave']);
+    const imageIndex = findColumn(RicFaccImages.IMAGE_KEYS);
 
     if (promptIndex < 0 || optionAIndex < 0 || optionBIndex < 0) {
         throw new Error('Il CSV deve contenere almeno le colonne: Domanda, Risposta A, Risposta B.');
@@ -341,16 +352,19 @@ function parseCsvQuestions(text) {
             title: titleIndex >= 0 && columns[titleIndex] ? columns[titleIndex] : `Domanda ${rowIndex + 1}`,
             prompt: columns[promptIndex],
             options: rawOptions,
-            correct: correctIndex >= 0 ? columns[correctIndex] : null
+            correct: correctIndex >= 0 ? columns[correctIndex] : null,
+            image: imageIndex >= 0 ? columns[imageIndex] : ''
         }, rowIndex);
     });
 }
 
-function parseXlsxQuestions(arrayBuffer) {
+// Le immagini incorporate nel foglio sono salvate sul server e collegate alla domanda della stessa riga.
+// Gli eventuali avvisi viaggiano sull'array restituito (imageWarnings).
+async function parseXlsxQuestions(arrayBuffer) {
     if (typeof XLSX === 'undefined') {
         throw new Error('Libreria Excel non ancora caricata nel browser.');
     }
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const workbook = XLSX.read(arrayBuffer, { type: 'array', bookFiles: true });
     const firstSheetName = workbook.SheetNames[0];
     if (!firstSheetName) {
         throw new Error('Il file Excel non contiene fogli leggibili.');
@@ -360,7 +374,10 @@ function parseXlsxQuestions(arrayBuffer) {
     if (!rows.length) {
         throw new Error('Il file Excel non contiene righe con domande.');
     }
-    return rows.map((row, index) => mapRowToQuestion(row, index));
+    const questions = rows.map((row, index) => mapRowToQuestion(row, index));
+    const { warnings } = await RicFaccImages.attachWorkbookImages(workbook, firstSheetName, rows, questions);
+    questions.imageWarnings = warnings;
+    return questions;
 }
 
 function escapeHtml(value) {
@@ -456,6 +473,9 @@ function getChoiceTag(snapshot, index) {
     if (snapshot.selectedIndex === index) {
         return 'Scelta';
     }
+    if (snapshot.currentState === 'preselect' && snapshot.focusedIndex === index) {
+        return 'In selezione';
+    }
     if (snapshot.focusedIndex === index) {
         return 'Focus';
     }
@@ -479,6 +499,9 @@ function renderChoices(snapshot) {
         }
         if (snapshot.selectedIndex === index) {
             classes.push('is-selected');
+        }
+        if (snapshot.currentState === 'preselect' && snapshot.focusedIndex === index) {
+            classes.push('is-selecting');
         }
         if (snapshot.answerLockedIndex === index) {
             classes.push('is-locked');
@@ -760,6 +783,18 @@ function renderSnapshot(snapshot, commandAck = null) {
         }
     }
 
+    if (teacherQuestionImage) {
+        const questionImageUrl = snapshot.currentQuestion && snapshot.currentQuestion.image;
+        teacherQuestionImage.hidden = !questionImageUrl;
+        if (questionImageUrl) {
+            if (teacherQuestionImage.getAttribute('src') !== questionImageUrl) {
+                teacherQuestionImage.src = questionImageUrl;
+            }
+        } else {
+            teacherQuestionImage.removeAttribute('src');
+        }
+    }
+
     if (snapshot.currentQuestion) {
         teacherQuestionTitle.textContent = snapshot.currentQuestion.title;
         teacherQuestionPrompt.textContent = snapshot.currentQuestion.prompt;
@@ -789,6 +824,11 @@ function renderSnapshot(snapshot, commandAck = null) {
             const total = snapshot.questionCount || (esatte + errate);
             completedTestMessage.textContent = `Lo studente ${activeCompletedResult.student} ha concluso il test con punteggio ${pct}% (${esatte} risposte esatte, ${errate} errate su ${total} domande).`;
         }
+        if (teacherDownloadCompletedLink) {
+            const student = activeCompletedResult.student || currentActiveStudent;
+            const file = activeCompletedResult.fileName || '';
+            teacherDownloadCompletedLink.href = `/api/quiz/export-pdf?student=${encodeURIComponent(student)}&file=${encodeURIComponent(file)}&download=1`;
+        }
         if (teacherCompletedAlertCard) teacherCompletedAlertCard.hidden = false;
     }
 
@@ -796,6 +836,22 @@ function renderSnapshot(snapshot, commandAck = null) {
     setMetric(teacherRightEar, snapshot.metrics && snapshot.metrics.rightEar);
     setMetric(teacherAverageEar, snapshot.metrics && snapshot.metrics.averageEar);
     setMetric(teacherMar, snapshot.metrics && snapshot.metrics.mar);
+
+    lastReceivedSnapshot = snapshot;
+    if (teacherQuestionnaireInfoBadge) {
+        if (snapshot.questionnaire && Array.isArray(snapshot.questionnaire.questions) && snapshot.questionnaire.questions.length > 0) {
+            const total = snapshot.questionnaire.questions.length;
+            const answered = (snapshot.questionnaire.answers || []).filter(Boolean).length;
+            teacherQuestionnaireInfoBadge.textContent = `${total} ${total === 1 ? 'domanda' : 'domande'} (${answered} risposte)`;
+            teacherQuestionnaireInfoBadge.style.color = '#2de2e6';
+        } else if (snapshot.currentQuestion) {
+            teacherQuestionnaireInfoBadge.textContent = 'Quiz in corso';
+            teacherQuestionnaireInfoBadge.style.color = '#2de2e6';
+        } else {
+            teacherQuestionnaireInfoBadge.textContent = 'In attesa di domande';
+            teacherQuestionnaireInfoBadge.style.color = 'var(--muted)';
+        }
+    }
 
     renderChoices(snapshot);
     renderEvents(snapshot);
@@ -942,11 +998,19 @@ function clearQuestionForm() {
     if (teacherOptionCInput) teacherOptionCInput.value = '';
     if (teacherOptionDInput) teacherOptionDInput.value = '';
     if (teacherCorrectAnswerInput) teacherCorrectAnswerInput.value = '0';
+    if (teacherQuestionImageInput) teacherQuestionImageInput.value = '';
 }
 
 async function sendQuestionCommand(commandType) {
     try {
         const question = buildQuestionPayload();
+
+        const imageFile = teacherQuestionImageInput && teacherQuestionImageInput.files && teacherQuestionImageInput.files[0];
+        if (imageFile) {
+            setActionStatus(`Caricamento immagine ${imageFile.name}...`);
+            question.image = await RicFaccImages.uploadFile(imageFile);
+        }
+
         await sendCommand(commandType, { question });
         clearQuestionForm();
         setActionStatus(`Domanda "${question.title}" (${question.options.length} scelte) inviata al quiz.`);
@@ -1055,7 +1119,8 @@ function downloadXlsxTemplate() {
             "Risposta B": "Giove",
             "Risposta C": "Venere",
             "Risposta D": "Nettuno",
-            "Risposta Esatta": "A"
+            "Risposta Esatta": "A",
+            "Immagine": ""
         },
         {
             "Titolo": "Esempio 3 Scelte",
@@ -1064,7 +1129,8 @@ function downloadXlsxTemplate() {
             "Risposta B": "Elettrico",
             "Risposta C": "Magnetico",
             "Risposta D": "",
-            "Risposta Esatta": "A"
+            "Risposta Esatta": "A",
+            "Immagine": ""
         },
         {
             "Titolo": "Esempio 2 Scelte (Vero/Falso)",
@@ -1073,7 +1139,8 @@ function downloadXlsxTemplate() {
             "Risposta B": "Falso",
             "Risposta C": "",
             "Risposta D": "",
-            "Risposta Esatta": "A"
+            "Risposta Esatta": "A",
+            "Immagine": ""
         }
     ];
 
@@ -1085,7 +1152,8 @@ function downloadXlsxTemplate() {
         { wch: 20 },
         { wch: 20 },
         { wch: 20 },
-        { wch: 16 }
+        { wch: 16 },
+        { wch: 26 }
     ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Domande Quiz");
@@ -1097,10 +1165,10 @@ function downloadXlsxTemplate() {
 
 function downloadCsvTemplate() {
     const csvContent = [
-        'Titolo,Domanda,Risposta A,Risposta B,Risposta C,Risposta D,Risposta Esatta',
-        '"Esempio 4 Scelte","Quale pianeta del nostro sistema solare e conosciuto come il Pianeta Rosso?","Marte","Giove","Venere","Nettuno","A"',
-        '"Esempio 3 Scelte","Quale fra questi e uno stato fisico fondamentale della materia?","Solido","Elettrico","Magnetico","","A"',
-        '"Esempio 2 Scelte (Vero/Falso)","Il Sole e una stella situata al centro del nostro sistema planetario?","Vero","Falso","","","A"'
+        'Titolo,Domanda,Risposta A,Risposta B,Risposta C,Risposta D,Risposta Esatta,Immagine',
+        '"Esempio 4 Scelte","Quale pianeta del nostro sistema solare e conosciuto come il Pianeta Rosso?","Marte","Giove","Venere","Nettuno","A",""',
+        '"Esempio 3 Scelte","Quale fra questi e uno stato fisico fondamentale della materia?","Solido","Elettrico","Magnetico","","A",""',
+        '"Esempio 2 Scelte (Vero/Falso)","Il Sole e una stella situata al centro del nostro sistema planetario?","Vero","Falso","","","A",""'
     ].join('\r\n');
 
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' });
@@ -1158,6 +1226,10 @@ function renderExcelPreview(questions, fileName) {
                     <span class="excel-preview-card-badge">${q.options.length} scelte</span>
                 </div>
                 <p class="excel-preview-card-prompt">${escapeHtml(q.prompt)}</p>
+                ${q.image ? `
+                <figure class="excel-preview-card-media">
+                    <img src="${escapeHtml(q.image)}" alt="Immagine della domanda">
+                </figure>` : ''}
                 <div class="excel-preview-card-options">
                     ${q.options.map((opt, optIdx) => {
                         const isCorrect = q.correctIndex === optIdx;
@@ -1172,7 +1244,15 @@ function renderExcelPreview(questions, fileName) {
 
     if (teacherDropzone) teacherDropzone.hidden = true;
     if (teacherExcelPreviewArea) teacherExcelPreviewArea.hidden = false;
-    setExcelStatus(`${fileName}: ${questions.length} domande lette con successo!`);
+
+    const withImage = questions.filter((q) => q.image).length;
+    const warnings = (questions.imageWarnings || []).join(' ');
+    const imageSummary = withImage > 0 ? ` (${withImage} con immagine)` : '';
+    if (warnings) {
+        setExcelStatus(`${fileName}: ${questions.length} domande lette${imageSummary}. Attenzione: ${warnings}`, true);
+    } else {
+        setExcelStatus(`${fileName}: ${questions.length} domande lette con successo!${imageSummary}`);
+    }
 }
 
 async function handleExcelFile(file) {
@@ -1187,7 +1267,7 @@ async function handleExcelFile(file) {
             questions = parseCsvQuestions(text);
         } else if (extension === 'xlsx' || extension === 'xls') {
             const buffer = await file.arrayBuffer();
-            questions = parseXlsxQuestions(buffer);
+            questions = await parseXlsxQuestions(buffer);
         } else {
             throw new Error('Formato non supportato. Carica un file .xlsx, .xls o .csv.');
         }
@@ -1195,6 +1275,9 @@ async function handleExcelFile(file) {
         if (!Array.isArray(questions) || questions.length === 0) {
             throw new Error('Nessuna domanda valida trovata nel file.');
         }
+
+        const missingImages = await RicFaccImages.findMissingImages(questions);
+        questions.imageWarnings = [...(questions.imageWarnings || []), ...missingImages];
 
         renderExcelPreview(questions, file.name);
     } catch (error) {
@@ -1382,6 +1465,76 @@ if (teacherPrintCompletedBtn) {
     });
 }
 
+if (teacherSaveDesktopCompletedBtn) {
+    teacherSaveDesktopCompletedBtn.addEventListener('click', async () => {
+        const student = activeCompletedResult?.student || currentActiveStudent;
+        const file = activeCompletedResult?.fileName || '';
+        teacherSaveDesktopCompletedBtn.disabled = true;
+        if (teacherExportResultStatus) {
+            teacherExportResultStatus.hidden = false;
+            teacherExportResultStatus.style.color = '#38bdf8';
+            teacherExportResultStatus.textContent = 'Esportazione del PDF sul Desktop del server in corso...';
+        }
+        try {
+            const res = await fetchJson('/api/quiz/export-pdf-desktop', {
+                method: 'POST',
+                body: JSON.stringify({ student, file })
+            });
+            if (res && res.ok) {
+                if (teacherExportResultStatus) {
+                    teacherExportResultStatus.style.color = '#4ade80';
+                    teacherExportResultStatus.textContent = `✅ PDF salvato con successo sul Desktop del server: ${res.fileName}`;
+                }
+                setActionStatus(`PDF salvato sul Desktop: ${res.fileName}`);
+                alert(`PDF esportato con successo sul Desktop del server!\n\nFile: ${res.fileName}\nPercorso: ${res.desktopPath}`);
+            } else {
+                throw new Error((res && res.error) || 'Errore salvataggio PDF.');
+            }
+        } catch (e) {
+            if (teacherExportResultStatus) {
+                teacherExportResultStatus.style.color = '#f87171';
+                teacherExportResultStatus.textContent = `❌ Errore: ${e.message}`;
+            }
+            setActionStatus(`Errore: ${e.message}`, true);
+        } finally {
+            teacherSaveDesktopCompletedBtn.disabled = false;
+        }
+    });
+}
+
+if (teacherOpenStudentCompletedBtn) {
+    teacherOpenStudentCompletedBtn.addEventListener('click', async () => {
+        const student = activeCompletedResult?.student || currentActiveStudent;
+        const file = activeCompletedResult?.fileName || '';
+        teacherOpenStudentCompletedBtn.disabled = true;
+        try {
+            const res = await fetchJson('/api/quiz/open-student-pdf', {
+                method: 'POST',
+                body: JSON.stringify({ student, file })
+            });
+            if (res && res.ok) {
+                if (teacherExportResultStatus) {
+                    teacherExportResultStatus.hidden = false;
+                    teacherExportResultStatus.style.color = '#4ade80';
+                    teacherExportResultStatus.textContent = '✅ Comando inviato: la scheda PDF si aprirà nel browser dello studente!';
+                }
+                setActionStatus('Comando inviato: apertura PDF nel browser studente');
+            } else {
+                throw new Error((res && res.error) || 'Errore invio comando a studente.');
+            }
+        } catch (e) {
+            if (teacherExportResultStatus) {
+                teacherExportResultStatus.hidden = false;
+                teacherExportResultStatus.style.color = '#f87171';
+                teacherExportResultStatus.textContent = `❌ Errore: ${e.message}`;
+            }
+            setActionStatus(`Errore: ${e.message}`, true);
+        } finally {
+            teacherOpenStudentCompletedBtn.disabled = false;
+        }
+    });
+}
+
 if (teacherDismissCompletedBtn) {
     teacherDismissCompletedBtn.addEventListener('click', () => {
         if (teacherCompletedAlertCard) teacherCompletedAlertCard.hidden = true;
@@ -1409,16 +1562,14 @@ async function loadResultsArchive() {
         }
 
         teacherArchiveList.innerHTML = files.map((f) => {
-            const isParziale = f.isParziale;
+            const isParziale = f.isParziale || f.tipoRisultato === 'parziale' || (f.fileName && f.fileName.includes('_parziale'));
             const badgeClass = isParziale ? 'status-warning' : 'status-success';
             const badgeText = isParziale ? 'Parziale / Sospeso' : 'Completato';
-            const scoreText = f.score ? `${f.score.percentuale || 0}% (${f.score.esatte || 0} esatte, ${f.score.errate || 0} errate)` : '-';
-            const printBtnHtml = !isParziale ? `
-                <a href="/stampa-risultato?student=${encodeURIComponent(currentActiveStudent)}&file=${encodeURIComponent(f.fileName)}&autoPrint=1"
-                   target="_blank" class="action-btn primary teacher-btn-xs" title="Stampa o Salva in formato PDF">
-                   🖨️ Stampa PDF
-                </a>
-            ` : '';
+            const scoreText = f.punteggio ? `${f.punteggio.percentuale || 0}% (${f.punteggio.esatte || 0} esatte, ${f.punteggio.errate || 0} errate)` : (f.score ? `${f.score.percentuale || 0}%` : '-');
+
+            const pdfExportUrl = `/api/quiz/export-pdf?student=${encodeURIComponent(currentActiveStudent)}&file=${encodeURIComponent(f.fileName)}`;
+            const pdfDownloadUrl = `${pdfExportUrl}&download=1`;
+            const printUrl = `/stampa-risultato?student=${encodeURIComponent(currentActiveStudent)}&file=${encodeURIComponent(f.fileName)}&autoPrint=1`;
 
             return `
                 <div class="archive-entry">
@@ -1434,7 +1585,24 @@ async function loadResultsArchive() {
                         </div>
                     </div>
                     <div class="archive-entry-actions">
-                        ${printBtnHtml}
+                        <button type="button" class="action-btn primary teacher-btn-xs archive-save-desktop-btn"
+                                data-student="${escapeTeacherHtml(currentActiveStudent)}"
+                                data-file="${escapeTeacherHtml(f.fileName)}"
+                                title="Salva direttamente in PDF sul Desktop del server">
+                            💾 Salva su Desktop
+                        </button>
+                        <button type="button" class="action-btn secondary teacher-btn-xs archive-open-student-btn"
+                                data-student="${escapeTeacherHtml(currentActiveStudent)}"
+                                data-file="${escapeTeacherHtml(f.fileName)}"
+                                title="Apri automaticamente il PDF nel browser dello studente">
+                            💻 Apri a Studente
+                        </button>
+                        <a href="${pdfDownloadUrl}" download class="action-btn secondary teacher-btn-xs" title="Scarica il PDF della prova">
+                            📥 Scarica PDF
+                        </a>
+                        <a href="${printUrl}" target="_blank" class="action-btn ghost teacher-btn-xs" title="Stampa o Salva tramite browser">
+                            🖨️ Stampa
+                        </a>
                     </div>
                 </div>
             `;
@@ -1444,6 +1612,62 @@ async function loadResultsArchive() {
         if (teacherArchiveStatus) teacherArchiveStatus.textContent = 'Errore';
         teacherArchiveList.innerHTML = `<p class="archive-error">Errore nel caricamento dei risultati: ${e.message}</p>`;
     }
+}
+
+// Delegazione eventi bottoni archivio
+if (teacherArchiveList) {
+    teacherArchiveList.addEventListener('click', async (e) => {
+        const saveBtn = e.target.closest('.archive-save-desktop-btn');
+        if (saveBtn) {
+            const student = saveBtn.dataset.student;
+            const file = saveBtn.dataset.file;
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Salvataggio...';
+            try {
+                const res = await fetchJson('/api/quiz/export-pdf-desktop', {
+                    method: 'POST',
+                    body: JSON.stringify({ student, file })
+                });
+                if (res && res.ok) {
+                    setActionStatus(`✅ PDF salvato sul Desktop del server: ${res.fileName}`);
+                    alert(`PDF esportato con successo sul Desktop del server!\n\nFile: ${res.fileName}\nPercorso: ${res.desktopPath}`);
+                } else {
+                    throw new Error((res && res.error) || 'Errore salvataggio.');
+                }
+            } catch (err) {
+                setActionStatus(`Errore: ${err.message}`, true);
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = '💾 Salva su Desktop';
+            }
+            return;
+        }
+
+        const openStudentBtn = e.target.closest('.archive-open-student-btn');
+        if (openStudentBtn) {
+            const student = openStudentBtn.dataset.student;
+            const file = openStudentBtn.dataset.file;
+            openStudentBtn.disabled = true;
+            openStudentBtn.textContent = 'Invio...';
+            try {
+                const res = await fetchJson('/api/quiz/open-student-pdf', {
+                    method: 'POST',
+                    body: JSON.stringify({ student, file })
+                });
+                if (res && res.ok) {
+                    setActionStatus('✅ PDF aperto nel browser dello studente!');
+                } else {
+                    throw new Error((res && res.error) || 'Errore invio a studente.');
+                }
+            } catch (err) {
+                setActionStatus(`Errore: ${err.message}`, true);
+            } finally {
+                openStudentBtn.disabled = false;
+                openStudentBtn.textContent = '💻 Apri a Studente';
+            }
+            return;
+        }
+    });
 }
 
 if (refreshArchiveBtn) {
@@ -1545,4 +1769,431 @@ if (teacherQueueSubjectBtn) {
 }
 
 void fetchStudentInfo();
+
+/* ============================================================
+   MODALE E SALVATAGGIO QUESTIONARIO STUDENTE IN CARTELLA A SCELTA
+   ============================================================ */
+let cachedServerFolders = null;
+
+const teacherOpenSaveQuestionnaireModalBtn = document.getElementById('teacherOpenSaveQuestionnaireModalBtn');
+const teacherHeaderSaveQuestionnaireBtn = document.getElementById('teacherHeaderSaveQuestionnaireBtn');
+const saveQuestionnaireModal = document.getElementById('saveQuestionnaireModal');
+const closeSaveQuestionnaireModalBtn = document.getElementById('closeSaveQuestionnaireModalBtn');
+const dismissSaveQuestionnaireModalBtn = document.getElementById('dismissSaveQuestionnaireModalBtn');
+const teacherQuestionnaireInfoBadge = document.getElementById('teacherQuestionnaireInfoBadge');
+
+const modalSummaryStudent = document.getElementById('modalSummaryStudent');
+const modalSummarySubject = document.getElementById('modalSummarySubject');
+const modalSummaryCount = document.getElementById('modalSummaryCount');
+const modalSummaryProgress = document.getElementById('modalSummaryProgress');
+const saveQuestionnaireFileNameInput = document.getElementById('saveQuestionnaireFileNameInput');
+const modalServerFolderPathInput = document.getElementById('modalServerFolderPathInput');
+const modalSaveToDeviceBtn = document.getElementById('modalSaveToDeviceBtn');
+const modalSaveToServerBtn = document.getElementById('modalSaveToServerBtn');
+const saveModalStatusMessage = document.getElementById('saveModalStatusMessage');
+
+async function loadServerFolders() {
+    if (cachedServerFolders) return cachedServerFolders;
+    try {
+        const res = await fetchJson('/api/system/folders');
+        if (res && res.ok) {
+            cachedServerFolders = res;
+            if (modalServerFolderPathInput && !modalServerFolderPathInput.value) {
+                modalServerFolderPathInput.value = res.desktop || '';
+            }
+            return res;
+        }
+    } catch (e) {
+        console.warn('Impossibile caricare percorsi cartelle server:', e);
+    }
+    return null;
+}
+
+function showModalStatus(message, isError = false) {
+    if (!saveModalStatusMessage) return;
+    saveModalStatusMessage.hidden = false;
+    saveModalStatusMessage.className = `save-modal-feedback ${isError ? 'error' : 'success'}`;
+    saveModalStatusMessage.textContent = message;
+}
+
+function clearModalStatus() {
+    if (!saveModalStatusMessage) return;
+    saveModalStatusMessage.hidden = true;
+    saveModalStatusMessage.textContent = '';
+}
+
+async function getActiveQuestionnaireData() {
+    // 1. Prova da snapshot live ricevuto dal PC studente
+    if (lastReceivedSnapshot && lastReceivedSnapshot.questionnaire && Array.isArray(lastReceivedSnapshot.questionnaire.questions) && lastReceivedSnapshot.questionnaire.questions.length > 0) {
+        return {
+            student: lastReceivedSnapshot.questionnaire.student || currentActiveStudent,
+            subject: lastReceivedSnapshot.questionnaire.subject || currentActiveSubject,
+            questions: lastReceivedSnapshot.questionnaire.questions,
+            answers: lastReceivedSnapshot.questionnaire.answers || [],
+            totaleDomande: lastReceivedSnapshot.questionnaire.totaleDomande || lastReceivedSnapshot.questionnaire.questions.length
+        };
+    }
+
+    // 2. Prova da endpoint server /api/quiz/current-questionnaire
+    try {
+        const res = await fetchJson(`/api/quiz/current-questionnaire?student=${encodeURIComponent(currentActiveStudent)}`);
+        if (res && res.hasQuestionnaire && res.questionnaire && Array.isArray(res.questionnaire.questions) && res.questionnaire.questions.length > 0) {
+            return res.questionnaire;
+        }
+    } catch (e) {}
+
+    // 3. Fallback su eventuali domande caricate dal docente
+    if (loadedExcelQuestions && loadedExcelQuestions.length > 0) {
+        return {
+            student: currentActiveStudent,
+            subject: currentActiveSubject,
+            questions: loadedExcelQuestions,
+            answers: [],
+            totaleDomande: loadedExcelQuestions.length
+        };
+    }
+
+    if (selectedSubjectQuestions && selectedSubjectQuestions.length > 0) {
+        return {
+            student: currentActiveStudent,
+            subject: selectedSubjectName || currentActiveSubject,
+            questions: selectedSubjectQuestions,
+            answers: [],
+            totaleDomande: selectedSubjectQuestions.length
+        };
+    }
+
+    return null;
+}
+
+function buildQuestionnaireRows(questions) {
+    return (questions || []).map((q, idx) => {
+        const opts = Array.isArray(q.options) ? q.options : [];
+        let correctLetter = 'A';
+        if (typeof q.correctIndex === 'number' && q.correctIndex >= 0 && q.correctIndex < opts.length) {
+            correctLetter = ['A', 'B', 'C', 'D'][q.correctIndex] || 'A';
+        } else if (q.correctLetter) {
+            correctLetter = q.correctLetter;
+        }
+        return {
+            "Titolo": q.title || `Domanda ${idx + 1}`,
+            "Domanda": q.prompt || '',
+            "Risposta A": opts[0] || '',
+            "Risposta B": opts[1] || '',
+            "Risposta C": opts[2] || '',
+            "Risposta D": opts[3] || '',
+            "Risposta Esatta": correctLetter,
+            "Immagine": q.image || ''
+        };
+    });
+}
+
+function buildQuestionnaireProgressRows(questions, answers) {
+    return (questions || []).map((q, idx) => {
+        const opts = Array.isArray(q.options) ? q.options : [];
+        const ans = answers && answers[idx];
+        let correctLetter = 'A';
+        if (typeof q.correctIndex === 'number' && q.correctIndex >= 0 && q.correctIndex < opts.length) {
+            correctLetter = ['A', 'B', 'C', 'D'][q.correctIndex] || 'A';
+        } else if (q.correctLetter) {
+            correctLetter = q.correctLetter;
+        }
+        let rispostaData = 'Non ancora fornita';
+        let esito = 'In attesa';
+        if (ans) {
+            rispostaData = ans.chosenLetter || (typeof ans.chosenIndex === 'number' ? ['A', 'B', 'C', 'D'][ans.chosenIndex] : 'Registrata');
+            esito = ans.isCorrect === true ? 'Corretta' : (ans.isCorrect === false ? 'Errata' : 'Registrata');
+        }
+        return {
+            "N": idx + 1,
+            "Titolo": q.title || `Domanda ${idx + 1}`,
+            "Testo Domanda": q.prompt || '',
+            "Risposta Esatta": correctLetter,
+            "Risposta Data": rispostaData,
+            "Esito": esito
+        };
+    });
+}
+
+function generateXlsxBuffer(data) {
+    if (typeof XLSX === 'undefined') {
+        throw new Error('Libreria Excel in caricamento. Riprova tra qualche istante.');
+    }
+    const rows = buildQuestionnaireRows(data.questions);
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    worksheet['!cols'] = [
+        { wch: 22 },
+        { wch: 50 },
+        { wch: 22 },
+        { wch: 22 },
+        { wch: 22 },
+        { wch: 22 },
+        { wch: 16 },
+        { wch: 26 }
+    ];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Domande Quiz");
+
+    // Foglio avanzamento/risposte studente
+    const progRows = buildQuestionnaireProgressRows(data.questions, data.answers);
+    const progSheet = XLSX.utils.json_to_sheet(progRows);
+    progSheet['!cols'] = [
+        { wch: 6 },
+        { wch: 20 },
+        { wch: 50 },
+        { wch: 16 },
+        { wch: 20 },
+        { wch: 16 }
+    ];
+    XLSX.utils.book_append_sheet(workbook, progSheet, "Risposte Studente");
+
+    return XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+}
+
+function generateCsvContent(data) {
+    const rows = buildQuestionnaireRows(data.questions);
+    const header = ['Titolo', 'Domanda', 'Risposta A', 'Risposta B', 'Risposta C', 'Risposta D', 'Risposta Esatta', 'Immagine'];
+    const escapeCsv = (val) => `"${String(val || '').replace(/"/g, '""')}"`;
+    const lines = [
+        header.join(','),
+        ...rows.map((r) => [
+            escapeCsv(r['Titolo']),
+            escapeCsv(r['Domanda']),
+            escapeCsv(r['Risposta A']),
+            escapeCsv(r['Risposta B']),
+            escapeCsv(r['Risposta C']),
+            escapeCsv(r['Risposta D']),
+            escapeCsv(r['Risposta Esatta']),
+            escapeCsv(r['Immagine'])
+        ].join(','))
+    ];
+    return '\uFEFF' + lines.join('\r\n');
+}
+
+function arrayBufferToBase64(buffer) {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return window.btoa(binary);
+}
+
+async function openSaveQuestionnaireModal() {
+    clearModalStatus();
+    await loadServerFolders();
+    const data = await getActiveQuestionnaireData();
+
+    const studentName = (data && data.student) || currentActiveStudent || 'Martinelli';
+    const subjectName = (data && data.subject) || currentActiveSubject || 'Italiano';
+    const qCount = (data && Array.isArray(data.questions)) ? data.questions.length : 0;
+    const answeredCount = (data && Array.isArray(data.answers)) ? data.answers.filter(Boolean).length : 0;
+
+    if (modalSummaryStudent) modalSummaryStudent.textContent = studentName;
+    if (modalSummarySubject) modalSummarySubject.textContent = subjectName;
+    if (modalSummaryCount) modalSummaryCount.textContent = `${qCount} domande`;
+    if (modalSummaryProgress) modalSummaryProgress.textContent = `${answeredCount} / ${qCount} risposte fornite`;
+
+    const now = new Date();
+    const dateStamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+    if (saveQuestionnaireFileNameInput) {
+        saveQuestionnaireFileNameInput.value = `Questionario_${subjectName}_${studentName}_${dateStamp}`;
+    }
+
+    if (saveQuestionnaireModal) {
+        saveQuestionnaireModal.hidden = false;
+    }
+}
+
+function closeSaveQuestionnaireModal() {
+    if (saveQuestionnaireModal) {
+        saveQuestionnaireModal.hidden = true;
+    }
+}
+
+if (teacherOpenSaveQuestionnaireModalBtn) {
+    teacherOpenSaveQuestionnaireModalBtn.addEventListener('click', openSaveQuestionnaireModal);
+}
+if (teacherHeaderSaveQuestionnaireBtn) {
+    teacherHeaderSaveQuestionnaireBtn.addEventListener('click', openSaveQuestionnaireModal);
+}
+if (closeSaveQuestionnaireModalBtn) {
+    closeSaveQuestionnaireModalBtn.addEventListener('click', closeSaveQuestionnaireModal);
+}
+if (dismissSaveQuestionnaireModalBtn) {
+    dismissSaveQuestionnaireModalBtn.addEventListener('click', closeSaveQuestionnaireModal);
+}
+
+// Preset buttons per cartella server
+document.querySelectorAll('.preset-folder-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+        const preset = btn.dataset.preset;
+        const folders = await loadServerFolders();
+        if (!folders) return;
+        if (modalServerFolderPathInput) {
+            if (preset === 'desktop') modalServerFolderPathInput.value = folders.desktop || '';
+            else if (preset === 'documents') modalServerFolderPathInput.value = folders.documents || '';
+            else if (preset === 'student') modalServerFolderPathInput.value = folders.studentFolder || '';
+            else if (preset === 'archive') modalServerFolderPathInput.value = folders.archiveFolder || '';
+        }
+    });
+});
+
+// Opzione A: Salva sul dispositivo con File Picker nativo
+if (modalSaveToDeviceBtn) {
+    modalSaveToDeviceBtn.addEventListener('click', async () => {
+        clearModalStatus();
+        try {
+            const data = await getActiveQuestionnaireData();
+            if (!data || !Array.isArray(data.questions) || data.questions.length === 0) {
+                showModalStatus('Nessuna domanda presente nel questionario attivo da salvare.', true);
+                return;
+            }
+
+            const baseName = (saveQuestionnaireFileNameInput && saveQuestionnaireFileNameInput.value.trim()) || 'Questionario_Studente';
+            const formatInput = document.querySelector('input[name="modalQuestionnaireFormat"]:checked');
+            const format = formatInput ? formatInput.value : 'xlsx';
+
+            if (format === 'all') {
+                // Scarica tutti e 3 i file
+                const xlsxBuf = generateXlsxBuffer(data);
+                const xlsxBlob = new Blob([xlsxBuf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                downloadBlob(xlsxBlob, `${baseName}.xlsx`);
+
+                const csvContent = generateCsvContent(data);
+                const csvBlob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+                downloadBlob(csvBlob, `${baseName}.csv`);
+
+                const jsonContent = JSON.stringify(data, null, 2);
+                const jsonBlob = new Blob([jsonContent], { type: 'application/json;charset=utf-8' });
+                downloadBlob(jsonBlob, `${baseName}.json`);
+
+                showModalStatus(`✅ Avviato il salvataggio di tutti i formati (.xlsx, .csv, .json) per: ${baseName}`, false);
+                return;
+            }
+
+            let blob = null;
+            let ext = '.xlsx';
+            let mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+            let typeDesc = 'Cartella di lavoro Excel (*.xlsx)';
+
+            if (format === 'xlsx') {
+                const buf = generateXlsxBuffer(data);
+                blob = new Blob([buf], { type: mimeType });
+            } else if (format === 'csv') {
+                ext = '.csv';
+                mimeType = 'text/csv';
+                typeDesc = 'File CSV (*.csv)';
+                blob = new Blob([generateCsvContent(data)], { type: 'text/csv;charset=utf-8' });
+            } else if (format === 'json') {
+                ext = '.json';
+                mimeType = 'application/json';
+                typeDesc = 'File JSON (*.json)';
+                blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
+            }
+
+            const fullFileName = `${baseName}${ext}`;
+
+            // Se il browser supporta il File System Access API nativo (scelta cartella)
+            if (typeof window.showSaveFilePicker === 'function') {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: fullFileName,
+                        types: [{
+                            description: typeDesc,
+                            accept: { [mimeType]: [ext] }
+                        }]
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                    showModalStatus(`✅ File salvato con successo nella cartella scelta: ${handle.name}`, false);
+                    return;
+                } catch (dialogErr) {
+                    if (dialogErr.name === 'AbortError') {
+                        // Utente ha cliccato Annulla nella finestra
+                        return;
+                    }
+                    console.warn('showSaveFilePicker fallback su download standard:', dialogErr);
+                }
+            }
+
+            // Fallback download browser
+            downloadBlob(blob, fullFileName);
+            showModalStatus(`✅ File scaricato con successo: ${fullFileName}`, false);
+        } catch (err) {
+            console.error('Errore salvataggio dispositivo:', err);
+            showModalStatus(`Errore durante il salvataggio: ${err.message}`, true);
+        }
+    });
+}
+
+// Opzione B: Salva su cartella del PC Server
+if (modalSaveToServerBtn) {
+    modalSaveToServerBtn.addEventListener('click', async () => {
+        clearModalStatus();
+        try {
+            const data = await getActiveQuestionnaireData();
+            if (!data || !Array.isArray(data.questions) || data.questions.length === 0) {
+                showModalStatus('Nessuna domanda presente nel questionario attivo da salvare.', true);
+                return;
+            }
+
+            const targetFolder = (modalServerFolderPathInput && modalServerFolderPathInput.value.trim()) || '';
+            const baseName = (saveQuestionnaireFileNameInput && saveQuestionnaireFileNameInput.value.trim()) || 'Questionario_Studente';
+            const formatInput = document.querySelector('input[name="modalQuestionnaireFormat"]:checked');
+            const format = formatInput ? formatInput.value : 'xlsx';
+
+            const filesToSend = [];
+
+            if (format === 'xlsx' || format === 'all') {
+                const buf = generateXlsxBuffer(data);
+                filesToSend.push({
+                    name: `${baseName}.xlsx`,
+                    base64: arrayBufferToBase64(buf)
+                });
+            }
+            if (format === 'csv' || format === 'all') {
+                filesToSend.push({
+                    name: `${baseName}.csv`,
+                    content: generateCsvContent(data)
+                });
+            }
+            if (format === 'json' || format === 'all') {
+                filesToSend.push({
+                    name: `${baseName}.json`,
+                    content: JSON.stringify(data, null, 2)
+                });
+            }
+
+            const payload = {
+                folderPath: targetFolder,
+                student: data.student || currentActiveStudent,
+                subject: data.subject || currentActiveSubject,
+                files: filesToSend
+            };
+
+            modalSaveToServerBtn.disabled = true;
+            modalSaveToServerBtn.textContent = 'Salvataggio in corso...';
+
+            const res = await fetchJson('/api/quiz/save-questionnaire-to-folder', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+
+            if (res && res.ok) {
+                showModalStatus(`✅ Questionario salvato con successo sul PC Server in:\n${res.folderPath}\n(${res.fileCount} file creati)`, false);
+            } else {
+                throw new Error((res && res.error) || 'Errore salvataggio server.');
+            }
+        } catch (err) {
+            console.error('Errore salvataggio server:', err);
+            showModalStatus(`Errore salvataggio server: ${err.message}`, true);
+        } finally {
+            modalSaveToServerBtn.disabled = false;
+            modalSaveToServerBtn.textContent = '💾 Salva nella cartella del server PC';
+        }
+    });
+}
 

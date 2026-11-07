@@ -352,6 +352,9 @@ const questionCounter = document.getElementById('questionCounter');
 const instructionBar = document.querySelector('.instruction-bar');
 const questionCard = document.querySelector('.question-card');
 const questionText = document.getElementById('questionText');
+const questionMedia = document.getElementById('questionMedia');
+const questionImage = document.getElementById('questionImage');
+const questionImageFallback = document.getElementById('questionImageFallback');
 const systemState = document.getElementById('systemState');
 const systemInstruction = document.getElementById('systemInstruction');
 const mouthCommandLabel = document.getElementById('mouthCommandLabel');
@@ -677,11 +680,14 @@ function normalizeQuestion(rawQuestion, index) {
         index
     );
 
+    const image = RicFaccImages.readQuestionImage(rawQuestion);
+
     return {
         title,
         prompt,
         options,
-        correctIndex
+        correctIndex,
+        ...(image ? { image } : {})
     };
 }
 
@@ -846,7 +852,10 @@ function buildStudentSnapshot(includeFrames = false) {
             title: question.title,
             prompt: question.prompt,
             options: [...question.options],
-            correctIndex: question.correctIndex
+            correctIndex: question.correctIndex,
+            // Le immagini incorporate (data URI) non viaggiano nello snapshot: sarebbero troppo pesanti.
+            image: question.image && !question.image.startsWith('data:') ? question.image : '',
+            hasImage: Boolean(question.image)
         } : null,
         events: remoteEventHistory.slice(0, CONFIG.eventLogSize),
         remote: {
@@ -862,6 +871,29 @@ function buildStudentSnapshot(includeFrames = false) {
             answersCount: currentQuizSession.answers.filter(Boolean).length,
             score: currentQuizSession.score,
             fileName: currentQuizSession.fileName
+        },
+        questionnaire: {
+            student: currentQuizSession.student || 'Martinelli',
+            subject: currentQuizSession.subject || 'Italiano',
+            totaleDomande: questionSet.length,
+            currentIndex: currentQuestionIndex,
+            status: currentQuizSession.status,
+            questions: (questionSet || []).map((q, idx) => ({
+                id: q.id || (idx + 1),
+                title: q.title || `Domanda ${idx + 1}`,
+                prompt: q.prompt || '',
+                options: Array.isArray(q.options) ? [...q.options] : [],
+                correctIndex: typeof q.correctIndex === 'number' ? q.correctIndex : 0,
+                correctLetter: ['A', 'B', 'C', 'D'][q.correctIndex] || 'A',
+                image: q.image && !q.image.startsWith('data:') ? q.image : ''
+            })),
+            answers: (currentQuizSession.answers || []).map((ans) => ans ? {
+                questionIndex: ans.questionIndex,
+                chosenIndex: ans.chosenIndex,
+                chosenLetter: ans.chosenLetter,
+                isCorrect: ans.isCorrect,
+                outcome: ans.outcome
+            } : null)
         },
         updatedAt: new Date().toISOString()
     };
@@ -1039,7 +1071,8 @@ function mapRowToQuestion(row, rowIndex) {
         title,
         prompt,
         options: rawOptions,
-        correct
+        correct,
+        image: RicFaccImages.readQuestionImage(normalizedRow)
     }, rowIndex);
 }
 
@@ -1063,6 +1096,7 @@ function parseCsvQuestions(text) {
     const optionCIndex = findColumn(['optionc', 'opzionec', 'rispostac', 'c', 'opzione3', 'risposta3']);
     const optionDIndex = findColumn(['optiond', 'opzioned', 'rispostad', 'd', 'opzione4', 'risposta4']);
     const correctIndex = findColumn(['correct', 'corretta', 'rispostaesatta', 'rispostacorretta', 'esatta', 'answer', 'risposta', 'soluzione', 'chiave']);
+    const imageIndex = findColumn(RicFaccImages.IMAGE_KEYS);
 
     if (promptIndex < 0 || optionAIndex < 0 || optionBIndex < 0) {
         throw new Error('Il CSV deve contenere almeno le colonne: Domanda, Risposta A, Risposta B.');
@@ -1080,17 +1114,20 @@ function parseCsvQuestions(text) {
             title: titleIndex >= 0 && columns[titleIndex] ? columns[titleIndex] : `Domanda ${rowIndex + 1}`,
             prompt: columns[promptIndex],
             options: rawOptions,
-            correct: correctIndex >= 0 ? columns[correctIndex] : null
+            correct: correctIndex >= 0 ? columns[correctIndex] : null,
+            image: imageIndex >= 0 ? columns[imageIndex] : ''
         }, rowIndex);
     });
 }
 
-function parseXlsxQuestions(arrayBuffer) {
+// Le immagini incorporate nel foglio (anche piu d'una per file) sono salvate sul server e collegate alla domanda
+// della stessa riga. Gli eventuali avvisi viaggiano sull'array restituito (imageWarnings).
+async function parseXlsxQuestions(arrayBuffer) {
     if (typeof XLSX === 'undefined') {
         throw new Error('Libreria Excel non disponibile nel browser.');
     }
 
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const workbook = XLSX.read(arrayBuffer, { type: 'array', bookFiles: true });
     const firstSheetName = workbook.SheetNames[0];
     if (!firstSheetName) {
         throw new Error('Il file XLSX non contiene fogli leggibili.');
@@ -1102,7 +1139,10 @@ function parseXlsxQuestions(arrayBuffer) {
         throw new Error('Il file XLSX non contiene righe di domande.');
     }
 
-    return rows.map((row, index) => mapRowToQuestion(row, index));
+    const questions = rows.map((row, index) => mapRowToQuestion(row, index));
+    const { warnings } = await RicFaccImages.attachWorkbookImages(workbook, firstSheetName, rows, questions);
+    questions.imageWarnings = warnings;
+    return questions;
 }
 
 function splitQuestionBlocks(text) {
@@ -1174,6 +1214,8 @@ function parseTxtQuestions(text) {
                 rawQuestion.optionD = value;
             } else if (['correct', 'corretta', 'answer', 'risposta'].includes(key)) {
                 rawQuestion.correct = value;
+            } else if (RicFaccImages.IMAGE_KEYS.includes(key)) {
+                rawQuestion.image = value;
             }
         });
 
@@ -1204,6 +1246,26 @@ function parseJsonQuestions(text) {
 }
 
 async function parseQuestionFile(file) {
+    const questions = await readQuestionsFromFile(file);
+    const missingImages = await RicFaccImages.findMissingImages(questions);
+    questions.imageWarnings = [...(questions.imageWarnings || []), ...missingImages];
+    return questions;
+}
+
+// Riepilogo per lo stato di caricamento: quante domande hanno un'immagine ed eventuali avvisi.
+function describeQuestionImages(questions) {
+    const withImage = questions.filter((question) => question.image).length;
+    const parts = [];
+    if (withImage > 0) {
+        parts.push(`${withImage} con immagine`);
+    }
+    return {
+        summary: parts.length ? `, ${parts.join(', ')}` : '',
+        warnings: (questions.imageWarnings || []).join(' ')
+    };
+}
+
+async function readQuestionsFromFile(file) {
     const extension = String(file.name.split('.').pop() || '').toLowerCase();
 
     if (extension === 'csv' || extension === 'json' || extension === 'txt') {
@@ -1252,10 +1314,10 @@ function downloadTextFile(fileName, content, mimeType) {
 
 function createCsvTemplate() {
     return [
-        'Titolo,Domanda,Risposta A,Risposta B,Risposta C,Risposta D,Risposta Esatta',
-        '"Esempio 4 Scelte","Quale pianeta del nostro sistema solare e conosciuto come il Pianeta Rosso?","Marte","Giove","Venere","Nettuno","A"',
-        '"Esempio 3 Scelte","Quale fra questi e uno stato fisico fondamentale della materia?","Solido","Elettrico","Magnetico","","A"',
-        '"Esempio 2 Scelte (Vero/Falso)","Il Sole e una stella situata al centro del nostro sistema planetario?","Vero","Falso","","","A"'
+        'Titolo,Domanda,Risposta A,Risposta B,Risposta C,Risposta D,Risposta Esatta,Immagine',
+        '"Esempio 4 Scelte","Quale pianeta del nostro sistema solare e conosciuto come il Pianeta Rosso?","Marte","Giove","Venere","Nettuno","A",""',
+        '"Esempio 3 Scelte","Quale fra questi e uno stato fisico fondamentale della materia?","Solido","Elettrico","Magnetico","","A",""',
+        '"Esempio 2 Scelte (Vero/Falso)","Il Sole e una stella situata al centro del nostro sistema planetario?","Vero","Falso","","","A",""'
     ].join('\r\n');
 }
 
@@ -1614,6 +1676,18 @@ async function executeRemoteCommand(command) {
         logEvent('Tablet docente: ripetizione della domanda corrente.');
         void readCurrentQuestion();
         return 'Domanda ripetuta sul PC.';
+    }
+
+    if (command.type === 'open-pdf') {
+        const url = payload.url || `/api/quiz/export-pdf?student=${encodeURIComponent(payload.student || currentQuizSession.student)}&file=${encodeURIComponent(payload.fileName || currentQuizSession.fileName || '')}`;
+        logEvent('Tablet docente: apertura scheda PDF della prova nel browser studente.');
+        try {
+            window.open(url, '_blank');
+        } catch (e) {
+            window.location.href = url;
+        }
+        speakText('Il professore ha aperto il documento PDF con i risultati della tua prova.', { interrupt: false });
+        return 'Scheda PDF della prova aperta nel browser studente.';
     }
 
     return 'Comando remoto ricevuto.';
@@ -2059,12 +2133,42 @@ function logEvent(message) {
     requestStudentSnapshotSync();
 }
 
+// Mostra (o nasconde) l'immagine della domanda accanto al testo.
+function renderQuestionImage(question) {
+    const hasImage = Boolean(question && question.image);
+    questionCard.classList.toggle('has-image', hasImage);
+    questionMedia.hidden = !hasImage;
+    questionImageFallback.hidden = true;
+    questionImageFallback.textContent = '';
+
+    if (!hasImage) {
+        questionImage.removeAttribute('src');
+        return;
+    }
+
+    questionImage.hidden = false;
+    questionImage.src = question.image;
+}
+
+// Se il file non si carica, lo studente vede un avviso al posto dell'immagine.
+questionImage.addEventListener('error', () => {
+    const question = simulationCompleted || awaitingQuestionFile ? null : currentQuestion();
+    if (!question || !question.image) {
+        return;
+    }
+    questionImage.hidden = true;
+    questionImageFallback.hidden = false;
+    questionImageFallback.textContent = 'Immagine non disponibile.';
+    logEvent(`Immagine non caricata: ${question.image}`);
+});
+
 function updateQuestionHeader() {
     clearReadingHighlight();
     if (simulationCompleted) {
         questionTitle.textContent = 'Quiz completato';
         questionCounter.textContent = `${questionSet.length} / ${questionSet.length}`;
         questionText.textContent = 'Quiz completato. In pausa, in attesa che il professore carichi nuove domande o concluda la sessione.';
+        renderQuestionImage(null);
         requestStudentSnapshotSync();
         return;
     }
@@ -2072,19 +2176,24 @@ function updateQuestionHeader() {
     questionTitle.textContent = question.title;
     questionCounter.textContent = `${currentQuestionIndex + 1} / ${questionSet.length}`;
     questionText.textContent = question.prompt;
+    renderQuestionImage(question);
     requestStudentSnapshotSync();
 }
 
 function syncConfirmCard() {
     const showConfirm = currentState === 'confirm';
     confirmCard.classList.toggle('hidden', !showConfirm);
-    if (!showConfirm || selectedIndex === null) {
+    if (!showConfirm || selectedIndex === null || selectedIndex < 0) {
         confirmProgress = 0;
         confirmProgressBar.style.transform = 'scaleX(0)';
         return;
     }
-    const label = OPTION_LETTERS[selectedIndex];
-    const option = currentQuestion().options[selectedIndex];
+    const currentQ = currentQuestion();
+    if (!currentQ || !currentQ.options || !currentQ.options[selectedIndex]) {
+        return;
+    }
+    const label = OPTION_LETTERS[selectedIndex] || 'A';
+    const option = currentQ.options[selectedIndex] || '';
     confirmTitle.textContent = `Hai scelto la ${label}`;
     confirmText.textContent = `Risposta in focus: ${option}. Apri la bocca per confermare. Tieni gli occhi chiusi per annullare.`;
     confirmProgressBar.style.transform = `scaleX(${confirmProgress})`;
@@ -2116,6 +2225,8 @@ function renderChoices() {
         const subject = currentQuizSession.subject || 'Quiz';
         const fileParam = currentQuizSession.fileName ? `&file=${encodeURIComponent(currentQuizSession.fileName)}` : '';
         const printUrl = `/stampa-risultato?student=${encodeURIComponent(student)}${fileParam}&autoPrint=1`;
+        const exportPdfDownloadUrl = `/api/quiz/export-pdf?student=${encodeURIComponent(student)}${fileParam}&download=1`;
+        const exportPdfViewUrl = `/api/quiz/export-pdf?student=${encodeURIComponent(student)}${fileParam}`;
 
         const completedBox = document.createElement('div');
         completedBox.className = 'quiz-completed-box';
@@ -2142,12 +2253,61 @@ function renderChoices() {
                 </div>
             </div>
             <div class="completed-actions">
-                <a href="${printUrl}" target="_blank" class="action-btn primary completed-print-btn">
-                    🖨️ Stampa Scheda Risultati (PDF)
+                <button type="button" id="studentExportDesktopBtn" class="action-btn primary completed-print-btn" title="Salva direttamente il PDF nella cartella Desktop del PC dove si trova il server">
+                    💾 Salva PDF su Desktop Server
+                </button>
+                <a href="${exportPdfViewUrl}" target="_blank" class="action-btn secondary completed-print-btn" title="Apri il documento PDF in una nuova scheda del browser">
+                    👁️ Apri PDF nel Browser
+                </a>
+                <a href="${exportPdfDownloadUrl}" class="action-btn secondary completed-print-btn" download title="Scarica il PDF della prova direttamente sul dispositivo">
+                    📥 Scarica PDF
+                </a>
+                <a href="${printUrl}" target="_blank" class="action-btn ghost completed-print-btn">
+                    🖨️ Stampa Scheda
                 </a>
             </div>
+            <div id="studentExportStatus" class="student-export-status" style="margin-top: 14px; font-weight: 700; font-size: 0.95rem; text-align: center; color: #16a34a;" hidden></div>
         `;
         choicesGrid.appendChild(completedBox);
+
+        const exportBtn = completedBox.querySelector('#studentExportDesktopBtn');
+        const statusBox = completedBox.querySelector('#studentExportStatus');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', async () => {
+                exportBtn.disabled = true;
+                if (statusBox) {
+                    statusBox.hidden = false;
+                    statusBox.style.color = '#2563eb';
+                    statusBox.textContent = 'Esportazione del PDF sul Desktop del server in corso...';
+                }
+                try {
+                    const res = await fetchJson('/api/quiz/export-pdf-desktop', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            student: currentQuizSession.student,
+                            file: currentQuizSession.fileName
+                        })
+                    });
+                    if (res && res.ok) {
+                        if (statusBox) {
+                            statusBox.style.color = '#16a34a';
+                            statusBox.textContent = `✅ PDF salvato con successo sul Desktop del server: ${res.fileName}`;
+                        }
+                        logEvent(`PDF salvato sul Desktop: ${res.fileName}`);
+                        speakText('Il documento PDF con la tua prova è stato salvato sul Desktop del computer.', { interrupt: false });
+                    } else {
+                        throw new Error((res && res.error) || 'Errore durante la generazione del PDF.');
+                    }
+                } catch (err) {
+                    if (statusBox) {
+                        statusBox.style.color = '#dc2626';
+                        statusBox.textContent = `❌ Errore esportazione: ${err.message}`;
+                    }
+                } finally {
+                    exportBtn.disabled = false;
+                }
+            });
+        }
         return;
     }
 
@@ -2158,10 +2318,14 @@ function renderChoices() {
 
     choicesGrid.innerHTML = question.options.map((option, index) => `
         <button class="choice-card" data-index="${index}" style="--choice-bg: ${CHOICE_THEMES[index]}; --progress: 0;">
+            <div class="choice-selection-badge" aria-hidden="true">
+                <span class="choice-badge-icon">⏳</span>
+                <span class="choice-badge-text">SELEZIONE IN CORSO</span>
+            </div>
             <div class="choice-progress"></div>
             <div class="choice-content">
                 <div class="choice-letter">${OPTION_LETTERS[index]}</div>
-                <div class="choice-text">${option}</div>
+                <div class="choice-text">${escapeHtml(option)}</div>
             </div>
         </button>
     `).join('');
@@ -2192,8 +2356,7 @@ function renderChoices() {
                 logEvent(`Safe check aggiornato manualmente sulla risposta ${OPTION_LETTERS[index]}.`);
             }
 
-            syncChoices();
-            syncConfirmCard();
+            updateStateUI();
         });
     });
 
@@ -2201,8 +2364,14 @@ function renderChoices() {
 }
 
 function syncChoices() {
+    if (currentState === 'confirm' && selectedIndex !== null) {
+        focusedIndex = selectedIndex;
+    }
+
     choiceButtons.forEach((button, index) => {
         const isFocused = index === focusedIndex && ['focus', 'preselect', 'confirm'].includes(currentState);
+        const isSelecting = currentState === 'preselect' && index === focusedIndex;
+        const isSelected = currentState === 'confirm' && index === selectedIndex;
         const isDimmed = currentState === 'confirm' && selectedIndex !== null && index !== selectedIndex;
         const answeredOrDone = currentState === 'answered' || currentState === 'done';
         const freeChoice = isFreeChoiceQuestion();
@@ -2217,35 +2386,67 @@ function syncChoices() {
             && answerLockedIndex !== currentQuestion().correctIndex;
 
         let progress = 0;
-        if (currentState === 'preselect' && index === focusedIndex) {
+        if (isSelecting) {
             progress = optionProgress;
-        } else if ((currentState === 'confirm' || currentState === 'answered' || currentState === 'done')
-            && index === selectedIndex) {
+        } else if ((currentState === 'confirm' || answeredOrDone) && index === (selectedIndex ?? answerLockedIndex)) {
             progress = 1;
         }
 
         button.classList.toggle('is-focused', isFocused);
+        button.classList.toggle('is-selecting', isSelecting);
+        button.classList.toggle('is-selected', isSelected);
         button.classList.toggle('is-dimmed', isDimmed);
         button.classList.toggle('is-confirmed', isConfirmed);
         button.classList.toggle('is-correct', isCorrect);
         button.classList.toggle('is-wrong', isWrong);
         button.style.setProperty('--progress', progress.toFixed(3));
+
+        const badge = button.querySelector('.choice-selection-badge');
+        if (badge) {
+            const badgeIcon = badge.querySelector('.choice-badge-icon');
+            const badgeText = badge.querySelector('.choice-badge-text');
+            if (isSelecting) {
+                if (badgeIcon) badgeIcon.textContent = '⏳';
+                if (badgeText) badgeText.textContent = 'SELEZIONE IN CORSO...';
+            } else if (isSelected) {
+                if (badgeIcon) badgeIcon.textContent = '✨';
+                if (badgeText) badgeText.textContent = 'RISPOSTA SELEZIONATA';
+            }
+        }
     });
 }
 
 function updateStateUI() {
-    const meta = STATE_META[currentState];
+    const meta = STATE_META[currentState] || STATE_META.idle;
     systemState.textContent = meta.label;
     systemState.style.background = meta.pill;
     phaseState.textContent = meta.phase;
     systemInstruction.textContent = meta.instruction;
 
-    if (currentState === 'focus' && focusedIndex >= 0) {
-        systemInstruction.textContent = `Risposta ${OPTION_LETTERS[focusedIndex]} in focus. Apri la bocca per continuare o chiudi gli occhi per selezionare.`;
+    const curQ = currentQuestion();
+    const optCount = curQ && Array.isArray(curQ.options) ? curQ.options.length : 0;
+
+    if (currentState === 'focus' && focusedIndex >= 0 && focusedIndex < optCount) {
+        const letter = OPTION_LETTERS[focusedIndex];
+        const optText = curQ.options[focusedIndex] || '';
+        systemInstruction.textContent = `Risposta ${letter} in evidenza (${optText}). Apri la bocca per scorrere o chiudi gli occhi per selezionare.`;
     }
 
-    if (currentState === 'confirm' && selectedIndex !== null) {
-        systemInstruction.textContent = `Safe check sulla risposta ${OPTION_LETTERS[selectedIndex]}. Bocca per confermare, occhi per annullare.`;
+    if (currentState === 'preselect' && focusedIndex >= 0 && focusedIndex < optCount) {
+        const letter = OPTION_LETTERS[focusedIndex];
+        const optText = curQ.options[focusedIndex] || '';
+        systemInstruction.textContent = `Stai selezionando la risposta ${letter} (${optText}). Mantieni gli occhi chiusi per completare la scelta!`;
+    }
+
+    if (currentState === 'confirm' && selectedIndex !== null && selectedIndex >= 0 && selectedIndex < optCount) {
+        const letter = OPTION_LETTERS[selectedIndex];
+        const optText = curQ.options[selectedIndex] || '';
+        systemInstruction.textContent = `Hai scelto la risposta ${letter} (${optText}). Apri la bocca per confermare, oppure chiudi gli occhi per annullare.`;
+    }
+
+    if (currentState === 'answered' || currentState === 'done') {
+        const chosen = answerLockedIndex !== null && answerLockedIndex >= 0 ? OPTION_LETTERS[answerLockedIndex] : '';
+        systemInstruction.textContent = chosen ? `Risposta ${chosen} registrata.` : 'Risposta registrata.';
     }
 
     if (currentState === 'done') {
@@ -2426,6 +2627,9 @@ function cancelPreselection(source) {
 }
 
 function completePreselection(source) {
+    if (focusedIndex < 0) {
+        focusedIndex = 0;
+    }
     selectedIndex = focusedIndex;
     optionProgress = 1;
     confirmProgress = 0;
@@ -2443,6 +2647,9 @@ function completePreselection(source) {
 
 function cancelSelection(source) {
     selectedIndex = null;
+    if (focusedIndex < 0) {
+        focusedIndex = 0;
+    }
     optionProgress = 0;
     confirmProgress = 0;
     confirmProgressMode = 'confirm';
@@ -2712,7 +2919,7 @@ function handleScrollCommand(source) {
         focusedIndex = (focusedIndex + 1) % currentQuestion().options.length;
         optionProgress = 0;
         setCommandState(`Scroll: risposta ${OPTION_LETTERS[focusedIndex]}`);
-        syncChoices();
+        updateStateUI();
         logEvent(`${source}: focus spostato sulla risposta ${OPTION_LETTERS[focusedIndex]}.`);
         speakText(`${currentQuestion().options[focusedIndex]}.`, {
             interrupt: true,
@@ -3093,6 +3300,10 @@ async function simulateEyeHold(mode, source) {
     ensureAudioContext();
 
     if (mode === 'select') {
+        if (focusedIndex < 0) {
+            focusedIndex = 0;
+            updateStateUI();
+        }
         beginPreselection(source);
     } else {
         confirmCancelEnabled = true;
@@ -3197,7 +3408,12 @@ questionFileInput.addEventListener('change', async (event) => {
 
     try {
         const questions = await parseQuestionFile(file);
+        const imageInfo = describeQuestionImages(questions);
         applyImportedQuestions(questions, file.name);
+        if (imageInfo.warnings) {
+            updateImportStatus(`Attenzione immagini: ${imageInfo.warnings}`, true);
+            logEvent(`Attenzione immagini: ${imageInfo.warnings}`);
+        }
     } catch (error) {
         console.error('Errore importazione test:', error);
         updateImportStatus(`Errore import: ${error.message}`, true);
@@ -3233,9 +3449,13 @@ async function loadQuestionFileFromGate(file) {
     try {
         const questions = await parseQuestionFile(file);
         publishQuestionBatchNow(questions, 'PC studente', currentQuizSession.subject);
-        const loadedMessage = `Caricato: ${file.name} (${questionSet.length} domande)`;
+        const imageInfo = describeQuestionImages(questions);
+        const loadedMessage = `Caricato: ${file.name} (${questionSet.length} domande${imageInfo.summary})`;
         updateImportStatus(loadedMessage);
         setGateFileStatus(loadedMessage);
+        if (imageInfo.warnings) {
+            logEvent(`Attenzione immagini: ${imageInfo.warnings}`);
+        }
         await startQuizAfterPublish();
     } catch (error) {
         console.error('Errore importazione test:', error);

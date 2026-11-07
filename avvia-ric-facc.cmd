@@ -33,7 +33,8 @@ if errorlevel 1 (
 if not defined PORT set "PORT=3000"
 
 echo.
-echo Avvio Ric_Facc...
+echo Avvio Mimika...
+echo Un programma ideato e gestito dal dott. Carlo Santoro
 echo La pagina studente si aprira' a schermo intero (modalita' kiosk).
 echo Per chiudere la pagina studente: Alt+F4.
 echo.

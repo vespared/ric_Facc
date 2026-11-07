@@ -28,7 +28,8 @@ if not errorlevel 1 (
 
 echo.
 echo ============================================================
-echo   Ric_Facc - Server Locale per Docente e Studente
+echo   Mimika - Server Locale per Docente e Studente
+echo   Un programma ideato e gestito dal dott. Carlo Santoro
 echo   Porta: %PORT%
 echo   Appena il docente inquadra il QR code con smartphone/tablet,
 echo   la pagina studente verra' aperta direttamente su questo PC.
